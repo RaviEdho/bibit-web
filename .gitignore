@@ -1,0 +1,22 @@
+# Data directory (large datasets, SQLite, CSVs)
+data/
+*.sqlite
+*.sqlite3
+*.db
+*.csv
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+
+# Node / Vite
+node_modules/
+dist/
+.DS_Store
+
+# Harness
+.omp/

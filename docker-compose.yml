@@ -1,0 +1,37 @@
+services:
+  # 1. Frontend Web SPA & Static API Server
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: bibit-web
+    restart: unless-stopped
+    volumes:
+      - ./data/public:/usr/share/nginx/html/api:ro
+    networks:
+      - gateway_net
+    expose:
+      - "80"
+
+  # 2. Daily Scraper, Analytics & Cache Exporter Worker
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: bibit-worker
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Jakarta
+      - BIBIT_DB_PATH=/app/data/bibit.sqlite
+      - BIBIT_PUBLIC_DIR=/app/data/public
+      - SCHEDULE_HOUR=22
+      - SCHEDULE_MINUTE=30
+      - SCRAPER_WORKERS=5
+    volumes:
+      - ./data:/app/data
+    networks:
+      - gateway_net
+
+networks:
+  gateway_net:
+    external: true
