@@ -15,8 +15,8 @@ export const App: React.FC = () => {
   const [graphInitialSymbol, setGraphInitialSymbol] = useState<string | null>(null);
 
   useEffect(() => {
-    // Cache-bust query to guarantee mobile browsers immediately get fresh summary.json
-    fetch(`/api/summary.json?t=${Date.now()}`, { cache: "no-cache" })
+    // Revalidate via HTTP ETag (304 Not Modified when unchanged)
+    fetch("/api/summary.json")
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to load summary data`);
         return res.json();

@@ -12,6 +12,9 @@ interface FundModalProps {
   onSelectFund?: (symbol: string) => void;
 }
 
+// In-memory cache for fund details during active session
+const fundDetailCache = new Map<string, FundDetail>();
+
 export const FundModal: React.FC<FundModalProps> = ({ symbol, onClose, onOpenSwitchGraph, onSelectFund }) => {
   const [fundDetail, setFundDetail] = useState<FundDetail | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
@@ -25,15 +28,26 @@ export const FundModal: React.FC<FundModalProps> = ({ symbol, onClose, onOpenSwi
       return;
     }
 
+    // Reset range calculations from previously viewed fund
+    setRangeMetrics(null);
+
+    if (fundDetailCache.has(symbol)) {
+      setFundDetail(fundDetailCache.get(symbol)!);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
-    fetch(`/api/funds/${symbol}.json?t=${Date.now()}`, { cache: "no-cache" })
+    fetch(`/api/funds/${symbol}.json`)
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}: Fund data not found`);
         return res.json();
       })
       .then((data: FundDetail) => {
+        fundDetailCache.set(symbol, data);
         setFundDetail(data);
         setLoading(false);
       })

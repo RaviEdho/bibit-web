@@ -37,6 +37,9 @@ function splitFundName(name: string): string[] {
   return line2 ? [line1, line2] : [line1];
 }
 
+// In-memory cache for switching graph during active session
+let switchingGraphCache: SwitchingGraphResponse | null = null;
+
 export const SwitchingGraphModal: React.FC<SwitchingGraphModalProps> = ({
   isOpen,
   onClose,
@@ -174,31 +177,42 @@ export const SwitchingGraphModal: React.FC<SwitchingGraphModalProps> = ({
   // Load graph JSON
   useEffect(() => {
     if (!isOpen) return;
+
+    const applyData = (json: SwitchingGraphResponse) => {
+      setData(json);
+      setLoading(false);
+
+      // Auto-select manager if initialSymbol provided
+      if (initialSymbol) {
+        const found = json.nodes.find((n) => n.symbol === initialSymbol);
+        if (found) {
+          setSelectedManager(found.manager);
+          setSelectedSymbol(found.symbol);
+          return;
+        }
+      }
+      // Default to the manager with the most switching pairs
+      if (json.managers.length > 0) {
+        setSelectedManager(json.managers[0].name);
+      }
+    };
+
+    if (switchingGraphCache) {
+      applyData(switchingGraphCache);
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
-    fetch(`/api/switching_graph.json?t=${Date.now()}`)
+    fetch("/api/switching_graph.json")
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}: Gagal memuat data graf switching`);
         return res.json();
       })
       .then((json: SwitchingGraphResponse) => {
-        setData(json);
-        setLoading(false);
-
-        // Auto-select manager if initialSymbol provided
-        if (initialSymbol) {
-          const found = json.nodes.find((n) => n.symbol === initialSymbol);
-          if (found) {
-            setSelectedManager(found.manager);
-            setSelectedSymbol(found.symbol);
-            return;
-          }
-        }
-        // Default to the manager with the most switching pairs
-        if (json.managers.length > 0) {
-          setSelectedManager(json.managers[0].name);
-        }
+        switchingGraphCache = json;
+        applyData(json);
       })
       .catch((err) => {
         setError(err.message);
