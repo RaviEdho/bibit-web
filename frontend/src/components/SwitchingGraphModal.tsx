@@ -103,6 +103,16 @@ export const SwitchingGraphModal: React.FC<SwitchingGraphModalProps> = ({
     return () => svgEl.removeEventListener("wheel", handleWheel);
   }, []);
 
+  // Prevent background scrolling when modal is open
+  useEffect(() => {
+    if (!isOpen) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isOpen]);
+
   // Mouse handlers for desktop pan
   const handleMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
     if (e.button !== 0) return;
@@ -378,7 +388,7 @@ export const SwitchingGraphModal: React.FC<SwitchingGraphModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-sm overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-sm overflow-y-auto custom-scrollbar">
       <div className="relative w-full max-w-6xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden my-auto max-h-[96vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-2.5 sm:px-5 sm:py-3 border-b border-slate-800 bg-slate-900/95">

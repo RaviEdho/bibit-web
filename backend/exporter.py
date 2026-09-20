@@ -144,6 +144,7 @@ def export_public_cache(db_path: str, public_dir: str):
             "instant_type": instant_type,
             "is_index_fund": is_index,
             "is_dividend": is_dividend,
+            "expense_ratio": expense_ratio,
             "min_buy": min_buy,
             "risk_profile": risk_profile,
             "metrics": presets,

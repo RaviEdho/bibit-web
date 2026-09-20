@@ -66,10 +66,20 @@ export const FundModal: React.FC<FundModalProps> = ({ symbol, onClose, onOpenSwi
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
+  // Prevent background scrolling when modal is open
+  useEffect(() => {
+    if (!symbol) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [symbol]);
+
   if (!symbol) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-sm overflow-y-auto custom-scrollbar">
       <div className="relative w-full max-w-5xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden my-auto max-h-[95vh] flex flex-col">
         {/* Header Bar */}
         <div className="flex items-start justify-between p-4 sm:p-5 border-b border-slate-800 bg-slate-900/90">
@@ -122,7 +132,7 @@ export const FundModal: React.FC<FundModalProps> = ({ symbol, onClose, onOpenSwi
         </div>
 
         {/* Content Body */}
-        <div className="p-4 sm:p-6 overflow-y-auto space-y-6 flex-1">
+        <div className="p-4 sm:p-6 overflow-y-auto custom-scrollbar space-y-6 flex-1">
           {loading && (
             <div className="py-20 flex flex-col items-center justify-center space-y-3">
               <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
@@ -167,7 +177,7 @@ export const FundModal: React.FC<FundModalProps> = ({ symbol, onClose, onOpenSwi
                     <span>Expense Ratio</span>
                   </div>
                   <div className="text-sm font-semibold text-white mt-1">
-                    {fundDetail.expense_ratio ? `${(fundDetail.expense_ratio * 100).toFixed(2)}%` : "-"}
+                    {fundDetail.expense_ratio != null ? `${(fundDetail.expense_ratio * 100).toFixed(2)}%` : "-"}
                   </div>
                 </div>
 
