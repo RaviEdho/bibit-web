@@ -51,6 +51,7 @@ export interface SummaryResponse {
 export interface NavPoint {
   time: string; // "YYYY-MM-DD"
   value: number; // NAV
+  raw_nav?: number; // Original non-adjusted unit NAV
 }
 
 export interface WindowMetric {

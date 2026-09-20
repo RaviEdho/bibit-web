@@ -144,21 +144,29 @@ def run_daily_sync(db_path: str, public_dir: str, period: str = "1m", workers: i
     # 1. Update product catalog
     update_products_catalog(db_path)
 
-    # 2. Get active symbols from DB
+    # 2. Get active symbols from DB and identify dividend funds
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
-    cur.execute("SELECT symbol, name FROM products WHERE tradeable = 1")
+    cur.execute("SELECT symbol, name, raw_json FROM products WHERE tradeable = 1")
     fund_rows = cur.fetchall()
     conn.close()
 
-    print(f"[*] Scraping NAV delta for {len(fund_rows)} funds using {workers} workers...")
+    div_symbols = set()
+    for sym, _, raw_json in fund_rows:
+        raw = json.loads(raw_json) if raw_json else {}
+        if bool(raw.get("is_has_dividend") or raw.get("dividend_date")):
+            div_symbols.add(sym)
+
+    print(f"[*] Scraping NAV delta for {len(fund_rows)} funds ({len(div_symbols)} dividend funds) using {workers} workers...")
     new_rows_count = 0
     errors = 0
 
     def task(item):
-        sym, _ = item
-        return scrape_fund_nav_delta(sym, period=period)
-
+        sym, _, _ = item
+        # For dividend funds, fetch period="all" because Bibit computes value_adjusted relative
+        # to the beginning of the requested timeframe. period="all" ensures continuous total return.
+        p = "all" if sym in div_symbols else period
+        return scrape_fund_nav_delta(sym, period=p)
     batch_inserts = []
     with ThreadPoolExecutor(max_workers=workers) as executor:
         futures = {executor.submit(task, item): item for item in fund_rows}
@@ -208,11 +216,14 @@ def recalculate_db_metrics(db_path: str):
     """
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
-    cur.execute("SELECT symbol FROM products WHERE tradeable = 1")
-    symbols = [r[0] for r in cur.fetchall()]
+    cur.execute("SELECT symbol, raw_json FROM products WHERE tradeable = 1")
+    products = cur.fetchall()
 
     updates = []
-    for sym in symbols:
+    for sym, raw_json in products:
+        raw = json.loads(raw_json) if raw_json else {}
+        is_dividend = bool(raw.get("is_has_dividend") or raw.get("dividend_date"))
+
         cur.execute("""
             SELECT date, nav, nav_adjusted
             FROM nav_history
@@ -222,7 +233,13 @@ def recalculate_db_metrics(db_path: str):
         history_rows = cur.fetchall()
         if not history_rows:
             continue
-        history = [{"date": r[0], "nav": r[1], "adj": r[2]} for r in history_rows]
+        history = [
+            {
+                "date": r[0],
+                "nav": r[2] if (is_dividend and r[2] is not None and r[2] > 0) else r[1],
+            }
+            for r in history_rows
+        ]
         presets = compute_all_presets(history)
 
         c1y = presets.get("1y", {}).get("cagr")
@@ -230,7 +247,6 @@ def recalculate_db_metrics(db_path: str):
         c5y = presets.get("5y", {}).get("cagr")
 
         updates.append((c1y, c3y, c5y, sym))
-
     cur.executemany("""
         UPDATE products
         SET cagr_1y = ?, cagr_3y = ?, cagr_5y = ?

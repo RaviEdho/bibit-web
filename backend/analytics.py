@@ -96,7 +96,14 @@ def compute_metrics_for_window(
     history is sorted ascending by date.
     Each item in history must have 'date' and 'nav'.
     """
-    window = [p for p in history if p["date"] >= start_date]
+    start_idx = 0
+    for idx, p in enumerate(history):
+        if p["date"] <= start_date:
+            start_idx = idx
+        else:
+            break
+
+    window = history[start_idx:]
     if len(window) < 2:
         return {
             "return": None,
@@ -147,14 +154,30 @@ def compute_all_presets(history: list[dict], reference_date_str: str | None = No
         one_day_ret = round(calculate_simple_return(history[-2]["nav"], history[-1]["nav"]) * 100, 2)
 
     # Date offsets
-    from datetime import timedelta
-    d_1m = (ref_date - timedelta(days=30)).strftime("%Y-%m-%d")
-    d_3m = (ref_date - timedelta(days=91)).strftime("%Y-%m-%d")
-    d_6m = (ref_date - timedelta(days=182)).strftime("%Y-%m-%d")
+    import calendar
+
+    def subtract_years(dt: date, y: int) -> date:
+        try:
+            return dt.replace(year=dt.year - y)
+        except ValueError:
+            return dt.replace(year=dt.year - y, day=28)
+
+    def subtract_months(dt: date, m: int) -> date:
+        y = dt.year - (m // 12)
+        new_m = dt.month - (m % 12)
+        if new_m < 1:
+            new_m += 12
+            y -= 1
+        max_d = calendar.monthrange(y, new_m)[1]
+        return date(y, new_m, min(dt.day, max_d))
+
+    d_1m = subtract_months(ref_date, 1).strftime("%Y-%m-%d")
+    d_3m = subtract_months(ref_date, 3).strftime("%Y-%m-%d")
+    d_6m = subtract_months(ref_date, 6).strftime("%Y-%m-%d")
     d_ytd = f"{ref_date.year}-01-01"
-    d_1y = (ref_date - timedelta(days=365)).strftime("%Y-%m-%d")
-    d_3y = (ref_date - timedelta(days=3 * 365)).strftime("%Y-%m-%d")
-    d_5y = (ref_date - timedelta(days=5 * 365)).strftime("%Y-%m-%d")
+    d_1y = subtract_years(ref_date, 1).strftime("%Y-%m-%d")
+    d_3y = subtract_years(ref_date, 3).strftime("%Y-%m-%d")
+    d_5y = subtract_years(ref_date, 5).strftime("%Y-%m-%d")
 
     m_1m = compute_metrics_for_window(history, d_1m, annual_rf)
     m_3m = compute_metrics_for_window(history, d_3m, annual_rf)

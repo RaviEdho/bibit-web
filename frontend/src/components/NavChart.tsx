@@ -13,22 +13,122 @@ import { computeRangeMetrics } from "../utils/metrics";
 interface NavChartProps {
   series: NavPoint[];
   symbol: string;
+  isDividend?: boolean;
   onRangeChange?: (metrics: RangeMetrics | null) => void;
 }
 
 export const NavChart: React.FC<NavChartProps> = ({
   series,
   symbol,
+  isDividend,
   onRangeChange,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const areaSeriesRef = useRef<ISeriesApi<"Area"> | null>(null);
+  const rawLineSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const isProgrammaticChangeRef = useRef<boolean>(true);
 
   const [activeTimeframe, setActiveTimeframe] = useState<string>("1Y");
   const [isLogScale, setIsLogScale] = useState<boolean>(false);
 
+  const hasDividend = Boolean(
+    isDividend &&
+    series.some((p) => p.raw_nav !== undefined && Math.abs(p.raw_nav - p.value) > 0.001)
+  );
+
+  const formatDateLocal = (d: Date): string => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  const getStartIndexForTimeframe = (tf: string): number => {
+    if (tf === "ALL" || !series || series.length === 0) return 0;
+
+    const lastDateStr = series[series.length - 1].time;
+    const [y, m, d] = lastDateStr.split("-").map(Number);
+    const lastDate = new Date(y, m - 1, d);
+    let targetDate = new Date(lastDate);
+
+    switch (tf) {
+      case "1M":
+        targetDate.setMonth(targetDate.getMonth() - 1);
+        break;
+      case "6M":
+        targetDate.setMonth(targetDate.getMonth() - 6);
+        break;
+      case "YTD":
+        targetDate = new Date(y, 0, 1);
+        break;
+      case "1Y":
+        targetDate.setFullYear(targetDate.getFullYear() - 1);
+        break;
+      case "3Y":
+        targetDate.setFullYear(targetDate.getFullYear() - 3);
+        break;
+      case "5Y":
+        targetDate.setFullYear(targetDate.getFullYear() - 5);
+        break;
+      default:
+        return 0;
+    }
+
+    const targetDateStr = formatDateLocal(targetDate);
+    let startIdx = 0;
+    for (let i = 0; i < series.length; i++) {
+      if (series[i].time <= targetDateStr) {
+        startIdx = i;
+      } else {
+        break;
+      }
+    }
+    return startIdx;
+  };
+
+  const applyRange = (fromIdx: number, toIdx: number, isAll: boolean = false) => {
+    if (!chartRef.current || !areaSeriesRef.current || !series || series.length === 0) return;
+
+    if (!hasDividend) {
+      if (isAll || fromIdx <= 0) {
+        chartRef.current.timeScale().fitContent();
+      } else {
+        chartRef.current.timeScale().setVisibleLogicalRange({
+          from: fromIdx,
+          to: toIdx,
+        });
+      }
+      return;
+    }
+
+    const baseRaw = series[fromIdx].raw_nav ?? series[fromIdx].value;
+    const baseAdj = series[fromIdx].value;
+
+    const adjustedData = series.map((p) => ({
+      time: p.time as Time,
+      value: baseAdj > 0 ? Number((baseRaw * (p.value / baseAdj)).toFixed(2)) : p.value,
+    }));
+
+    const rawData = series.map((p) => ({
+      time: p.time as Time,
+      value: p.raw_nav ?? p.value,
+    }));
+
+    areaSeriesRef.current.setData(adjustedData);
+    if (rawLineSeriesRef.current) {
+      rawLineSeriesRef.current.setData(rawData);
+    }
+
+    if (isAll || fromIdx <= 0) {
+      chartRef.current.timeScale().fitContent();
+    } else {
+      chartRef.current.timeScale().setVisibleLogicalRange({
+        from: fromIdx,
+        to: toIdx,
+      });
+    }
+  };
   useEffect(() => {
     if (!containerRef.current || !series || series.length === 0) return;
 
@@ -77,45 +177,51 @@ export const NavChart: React.FC<NavChartProps> = ({
     chartRef.current = chart;
 
     const areaSeries = chart.addAreaSeries({
-      topColor: "rgba(34, 197, 94, 0.4)",
+      topColor: "rgba(34, 197, 94, 0.35)",
       bottomColor: "rgba(34, 197, 94, 0.0)",
       lineColor: "#22c55e",
       lineWidth: 2,
+      priceLineVisible: false,
+      title: hasDividend ? "Return Disesuaikan" : "NAV",
     });
     areaSeriesRef.current = areaSeries;
 
-    // Filter valid chronological data
-    const chartData = series
-      .filter((p) => p.value > 0)
-      .map((p) => ({
-        time: p.time as Time,
-        value: p.value,
-      }));
+    let rawLineSeries: ISeriesApi<"Line"> | null = null;
+    if (hasDividend) {
+      rawLineSeries = chart.addLineSeries({
+        color: "#c084fc", // purple-400 (Bibit purple)
+        lineWidth: 2,
+        priceLineVisible: false,
+        title: "NAV Asli",
+      });
+      rawLineSeriesRef.current = rawLineSeries;
+    }
 
-    areaSeries.setData(chartData);
+    const initialFrom = getStartIndexForTimeframe("1Y");
+    const initialTo = series.length - 1;
 
-    // Calculate default 1-Year range
-    const lastDate = new Date(series[series.length - 1].time);
-    const targetDate = new Date(lastDate);
-    targetDate.setFullYear(targetDate.getFullYear() - 1);
-    const targetDateStr = targetDate.toISOString().split("T")[0];
-
-    const startIndex = series.findIndex((p) => p.time >= targetDateStr);
-    const fromIndex = startIndex !== -1 ? startIndex : 0;
-    const toIndex = series.length - 1;
-
+    if (!hasDividend) {
+      const chartData = series
+        .filter((p) => p.value > 0)
+        .map((p) => ({
+          time: p.time as Time,
+          value: p.value,
+        }));
+      areaSeries.setData(chartData);
+      chart.timeScale().setVisibleLogicalRange({
+        from: initialFrom,
+        to: initialTo,
+      });
+    } else {
+      applyRange(initialFrom, initialTo, false);
+    }
     isProgrammaticChangeRef.current = true;
-    chart.timeScale().setVisibleLogicalRange({
-      from: fromIndex,
-      to: toIndex,
-    });
     setTimeout(() => {
       isProgrammaticChangeRef.current = false;
     }, 150);
 
-    // Initial 1-Year range metrics
-    if (onRangeChange && chartData.length >= 2) {
-      const initialMetrics = computeRangeMetrics(series, fromIndex, toIndex);
+    if (onRangeChange && series.length >= 2) {
+      const initialMetrics = computeRangeMetrics(series, initialFrom, initialTo);
       onRangeChange(initialMetrics);
     }
 
@@ -149,7 +255,12 @@ export const NavChart: React.FC<NavChartProps> = ({
     window.addEventListener("resize", handleResize);
 
     return () => {
-      window.removeEventListener("resize", handleResize);
+      if (rawLineSeriesRef.current) {
+        rawLineSeriesRef.current = null;
+      }
+      if (areaSeriesRef.current) {
+        areaSeriesRef.current = null;
+      }
       if (chartRef.current) {
         chartRef.current.remove();
         chartRef.current = null;
@@ -174,49 +285,15 @@ export const NavChart: React.FC<NavChartProps> = ({
 
     isProgrammaticChangeRef.current = true;
 
-    if (tf === "ALL") {
-      chartRef.current.timeScale().fitContent();
-      setTimeout(() => {
-        isProgrammaticChangeRef.current = false;
-      }, 150);
-      return;
-    }
-
-    const lastDate = new Date(series[series.length - 1].time);
-    let targetDate = new Date(lastDate);
-
-    switch (tf) {
-      case "1M":
-        targetDate.setMonth(targetDate.getMonth() - 1);
-        break;
-      case "6M":
-        targetDate.setMonth(targetDate.getMonth() - 6);
-        break;
-      case "YTD":
-        targetDate = new Date(lastDate.getFullYear(), 0, 1);
-        break;
-      case "1Y":
-        targetDate.setFullYear(targetDate.getFullYear() - 1);
-        break;
-      case "3Y":
-        targetDate.setFullYear(targetDate.getFullYear() - 3);
-        break;
-      case "5Y":
-        targetDate.setFullYear(targetDate.getFullYear() - 5);
-        break;
-      default:
-        break;
-    }
-
-    const targetDateStr = targetDate.toISOString().split("T")[0];
-    const startIndex = series.findIndex((p) => p.time >= targetDateStr);
-    const fromIndex = startIndex !== -1 ? startIndex : 0;
+    const fromIndex = getStartIndexForTimeframe(tf);
     const toIndex = series.length - 1;
 
-    chartRef.current.timeScale().setVisibleLogicalRange({
-      from: fromIndex,
-      to: toIndex,
-    });
+    applyRange(fromIndex, toIndex, tf === "ALL");
+
+    if (onRangeChange) {
+      const metrics = computeRangeMetrics(series, fromIndex, toIndex);
+      onRangeChange(metrics);
+    }
 
     setTimeout(() => {
       isProgrammaticChangeRef.current = false;
@@ -244,6 +321,20 @@ export const NavChart: React.FC<NavChartProps> = ({
             </button>
           ))}
         </div>
+
+        {/* Legend for Dividend Funds */}
+        {hasDividend && (
+          <div className="flex flex-wrap items-center gap-3 text-xs font-medium px-2.5 py-1 bg-slate-800/60 rounded-lg border border-slate-700/60 shadow-sm">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50" />
+              <span className="text-emerald-400">Return Disesuaikan</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-purple-400 shadow-sm shadow-purple-400/50" />
+              <span className="text-purple-300">NAV Asli (Tanpa Dividen)</span>
+            </div>
+          </div>
+        )}
 
         <div className="flex items-center gap-2">
           {activeTimeframe === "" && (

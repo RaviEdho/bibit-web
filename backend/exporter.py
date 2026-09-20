@@ -89,14 +89,40 @@ def export_public_cache(db_path: str, public_dir: str):
         if not history_rows:
             continue
 
-        history = [{"date": r[0], "nav": r[1], "adj": r[2]} for r in history_rows]
-        total_points += len(history)
+        # For dividend funds, use nav_adjusted for returns, CAGR, and chart series (total return)
+        effective_history = [
+            {
+                "date": r[0],
+                "nav": r[2] if (is_dividend and r[2] is not None and r[2] > 0) else r[1],
+            }
+            for r in history_rows
+        ]
+        total_points += len(history_rows)
 
         # Compute all preset metrics (1D, 1M, 3M, 6M, YTD, 1Y, 3Y, 5Y, MAX)
-        presets = compute_all_presets(history)
+        presets = compute_all_presets(effective_history)
 
         # Build chart series (TradingView expects {time: "YYYY-MM-DD", value: number})
-        series = [{"time": r[0], "value": r[1]} for r in history_rows]
+        # For dividend funds, series includes both adjusted value and raw_nav (original unit price)
+        if is_dividend:
+            series = [
+                {
+                    "time": r[0],
+                    "value": r[2] if (r[2] is not None and r[2] > 0) else r[1],
+                    "raw_nav": r[1],
+                }
+                for r in history_rows
+            ]
+        else:
+            series = [
+                {
+                    "time": r[0],
+                    "value": r[1],
+                }
+                for r in history_rows
+            ]
+
+        latest_unit_nav = history_rows[-1][1]
 
         # Build individual fund detail JSON
         fund_payload = {
@@ -106,10 +132,10 @@ def export_public_cache(db_path: str, public_dir: str):
             "investment_manager": manager,
             "custodian_bank": custodian,
             "released_date": released_date,
-            "latest_nav": history[-1]["nav"],
-            "latest_date": history[-1]["date"],
-            "start_date": history[0]["date"],
-            "history_points": len(history),
+            "latest_nav": latest_unit_nav,
+            "latest_date": history_rows[-1][0],
+            "start_date": history_rows[0][0],
+            "history_points": len(history_rows),
             "aum": aum,
             "sharia": bool(sharia),
             "tradeable": tradeable,
@@ -146,10 +172,10 @@ def export_public_cache(db_path: str, public_dir: str):
             "manager": manager,
             "custodian": custodian,
             "aum": aum,
-            "nav": history[-1]["nav"],
-            "latest_date": history[-1]["date"],
-            "start_date": history[0]["date"],
-            "history_days": len(history),
+            "nav": latest_unit_nav,
+            "latest_date": history_rows[-1][0],
+            "start_date": history_rows[0][0],
+            "history_days": len(history_rows),
             "sharia": bool(sharia),
             "risk_profile": risk_profile,
             "expense_ratio": expense_ratio,

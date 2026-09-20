@@ -3,7 +3,7 @@ import { FundDetail, RangeMetrics } from "../types/fund";
 import { NavChart } from "./NavChart";
 import { MetricsCards } from "./MetricsCards";
 import { formatAum, formatCurrency, formatDate, formatPercent, formatManagerName } from "../utils/formatters";
-import { X, Calendar, DollarSign, PieChart, Shield, ArrowRightLeft, Network } from "lucide-react";
+import { X, Calendar, DollarSign, PieChart, Shield, ArrowRightLeft, Network, Banknote } from "lucide-react";
 
 interface FundModalProps {
   symbol: string | null;
@@ -72,6 +72,15 @@ export const FundModal: React.FC<FundModalProps> = ({ symbol, onClose, onOpenSwi
                   Syariah
                 </span>
               )}
+              {fundDetail?.is_dividend && (
+                <span
+                  className="px-2 py-0.5 rounded text-xs font-medium bg-emerald-950/90 text-emerald-300 border border-emerald-800 flex items-center gap-1"
+                  title="Reksa dana dividen: return dan grafik disesuaikan dengan dividen tunai (total return)"
+                >
+                  <Banknote className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Dividen (Adjusted)</span>
+                </span>
+              )}
               {fundDetail?.type && (
                 <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-950 text-blue-300 border border-blue-800">
                   {fundDetail.type}
@@ -122,6 +131,7 @@ export const FundModal: React.FC<FundModalProps> = ({ symbol, onClose, onOpenSwi
               <NavChart
                 series={fundDetail.series}
                 symbol={fundDetail.symbol}
+                isDividend={fundDetail.is_dividend}
                 onRangeChange={setRangeMetrics}
               />
 
