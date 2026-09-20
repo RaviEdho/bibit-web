@@ -30,6 +30,7 @@ export const NavChart: React.FC<NavChartProps> = ({
   const isProgrammaticChangeRef = useRef<boolean>(true);
   const animFrameRef = useRef<number | null>(null);
   const isPointerDownRef = useRef<boolean>(false);
+  const lastNormalizedFromIdxRef = useRef<number>(-1);
 
   const [activeTimeframe, setActiveTimeframe] = useState<string>("1Y");
   const [isLogScale, setIsLogScale] = useState<boolean>(false);
@@ -94,6 +95,23 @@ export const NavChart: React.FC<NavChartProps> = ({
     }
     return startIdx;
   };
+  const updateDividendAdjustment = (fromIdx: number) => {
+    if (!hasDividend || !areaSeriesRef.current || !series || series.length === 0) return;
+    const safeFrom = Math.max(0, Math.min(series.length - 1, fromIdx));
+    if (safeFrom === lastNormalizedFromIdxRef.current) return;
+    lastNormalizedFromIdxRef.current = safeFrom;
+
+    const baseRaw = series[safeFrom].raw_nav ?? series[safeFrom].value;
+    const baseAdj = series[safeFrom].value;
+
+    const adjustedData = series.map((p) => ({
+      time: p.time as Time,
+      value: baseAdj > 0 ? Number((baseRaw * (p.value / baseAdj)).toFixed(2)) : p.value,
+    }));
+
+    areaSeriesRef.current.setData(adjustedData);
+  };
+
 
   const applyRange = (fromIdx: number, toIdx: number, isAll: boolean = false) => {
     if (!chartRef.current || !areaSeriesRef.current || !series || series.length === 0) return;
@@ -118,23 +136,15 @@ export const NavChart: React.FC<NavChartProps> = ({
       }
       return;
     }
-
-    const baseRaw = series[fromIdx].raw_nav ?? series[fromIdx].value;
-    const baseAdj = series[fromIdx].value;
-
-    const adjustedData = series.map((p) => ({
-      time: p.time as Time,
-      value: baseAdj > 0 ? Number((baseRaw * (p.value / baseAdj)).toFixed(2)) : p.value,
-    }));
-
-    const rawData = series.map((p) => ({
-      time: p.time as Time,
-      value: p.raw_nav ?? p.value,
-    }));
-
-    areaSeriesRef.current.setData(adjustedData);
-    if (rawLineSeriesRef.current) {
-      rawLineSeriesRef.current.setData(rawData);
+    if (hasDividend) {
+      updateDividendAdjustment(fromIdx);
+      if (rawLineSeriesRef.current) {
+        const rawData = series.map((p) => ({
+          time: p.time as Time,
+          value: p.raw_nav ?? p.value,
+        }));
+        rawLineSeriesRef.current.setData(rawData);
+      }
     }
 
     if (isAll || fromIdx <= 0) {
@@ -367,6 +377,12 @@ export const NavChart: React.FC<NavChartProps> = ({
       if (isPointerDownRef.current) {
         isPointerDownRef.current = false;
         checkAndSnapBack();
+        if (chartRef.current) {
+          const logicalRange = chartRef.current.timeScale().getVisibleLogicalRange();
+          if (logicalRange) {
+            updateDividendAdjustment(Math.max(0, Math.floor(logicalRange.from)));
+          }
+        }
       }
     };
 
@@ -377,7 +393,15 @@ export const NavChart: React.FC<NavChartProps> = ({
         animFrameRef.current = null;
       }
       clearTimeout(wheelTimer);
-      wheelTimer = window.setTimeout(checkAndSnapBack, 80);
+      wheelTimer = window.setTimeout(() => {
+        checkAndSnapBack();
+        if (chartRef.current) {
+          const logicalRange = chartRef.current.timeScale().getVisibleLogicalRange();
+          if (logicalRange) {
+            updateDividendAdjustment(Math.max(0, Math.floor(logicalRange.from)));
+          }
+        }
+      }, 80);
     };
 
     const container = containerRef.current;
@@ -389,9 +413,13 @@ export const NavChart: React.FC<NavChartProps> = ({
     window.addEventListener("mouseup", onPointerUp);
     window.addEventListener("touchend", onPointerUp);
 
+    let dragDividendThrottle: number | undefined;
     let rangeChangeDebounce: number | undefined;
     chart.timeScale().subscribeVisibleLogicalRangeChange((logicalRange) => {
       if (!logicalRange || !onRangeChange || series.length < 2) return;
+
+      const fromIdx = Math.max(0, Math.floor(logicalRange.from));
+      const toIdx = Math.min(series.length - 1, Math.ceil(logicalRange.to));
 
       if (!isProgrammaticChangeRef.current) {
         setActiveTimeframe("");
@@ -399,10 +427,13 @@ export const NavChart: React.FC<NavChartProps> = ({
           clearTimeout(rangeChangeDebounce);
           rangeChangeDebounce = window.setTimeout(checkAndSnapBack, 80);
         }
+        if (hasDividend) {
+          clearTimeout(dragDividendThrottle);
+          dragDividendThrottle = window.setTimeout(() => {
+            updateDividendAdjustment(fromIdx);
+          }, 60);
+        }
       }
-
-      const fromIdx = Math.max(0, Math.floor(logicalRange.from));
-      const toIdx = Math.min(series.length - 1, Math.ceil(logicalRange.to));
 
       if (fromIdx < toIdx) {
         const metrics = computeRangeMetrics(series, fromIdx, toIdx);
@@ -432,6 +463,7 @@ export const NavChart: React.FC<NavChartProps> = ({
       }
       clearTimeout(wheelTimer);
       clearTimeout(rangeChangeDebounce);
+      clearTimeout(dragDividendThrottle);
       if (container) {
         container.removeEventListener("mousedown", onPointerDown);
         container.removeEventListener("touchstart", onPointerDown);
