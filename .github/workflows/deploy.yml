@@ -1,0 +1,35 @@
+name: Continuous Deployment
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy Bibit Web to Oracle Production
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH to Oracle and Redeploy
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script_stop: true
+          script: |
+            echo "🚀 Deploying latest Bibit Web to production..."
+            cd /home/ubuntu/bibit-web
+
+            # 1. Pull latest changes
+            git fetch origin main
+            git reset --hard origin/main
+
+            # 2. Build and restart containers safely
+            docker compose build
+            docker compose up -d --remove-orphans
+
+            # 3. Prune old unused images to save disk space
+            docker image prune -f
+
+            echo "✅ Bibit Web deployment completed successfully!"
