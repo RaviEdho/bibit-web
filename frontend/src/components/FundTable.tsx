@@ -14,14 +14,9 @@ type SortField =
   | "nav"
   | "return_1d"
   | "return_1m"
-  | "return_1y"
   | "cagr_1y"
   | "cagr_3y"
   | "max_drawdown_1y"
-  | "sharpe_1y"
-  | "sortino_1y"
-  | "ulcer_index_1y"
-  | "martin_ratio_1y"
   | "quality_score_1y"
   | "aum";
 export const FundTable: React.FC<FundTableProps> = ({ funds, onSelectFund, onOpenSwitchGraph }) => {

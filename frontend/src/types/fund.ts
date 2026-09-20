@@ -3,12 +3,8 @@ export interface FundSummary {
   name: string;
   type: string;
   manager: string | null;
-  custodian: string | null;
   aum: number | null;
   nav: number;
-  latest_date: string;
-  start_date: string;
-  history_days: number;
   sharia: boolean;
   tradeable: number;
   notbuyable: number;
@@ -16,9 +12,7 @@ export interface FundSummary {
   instant_type?: number | null;
   is_index_fund?: boolean;
   is_dividend?: boolean;
-  risk_profile: string | null;
-  expense_ratio: number | null;
-  min_buy: number | null;
+  switch_destinations_count?: number;
   return_1d: number | null;
   return_1m: number | null;
   return_ytd: number | null;
@@ -27,30 +21,16 @@ export interface FundSummary {
   return_5y?: number | null;
   cagr_1y: number | null;
   cagr_3y: number | null;
-  cagr_5y: number | null;
-  cagr_all: number | null;
   max_drawdown_1m?: number | null;
   max_drawdown_ytd?: number | null;
   max_drawdown_1y: number | null;
   max_drawdown_3y?: number | null;
   max_drawdown_5y?: number | null;
-  max_drawdown_all: number | null;
-  sharpe_1y: number | null;
-  sharpe_3y: number | null;
-  sortino_1y?: number | null;
-  sortino_3y?: number | null;
-  volatility_1y: number | null;
-  downside_volatility_1y?: number | null;
-  ulcer_index_1y?: number | null;
-  ulcer_index_3y?: number | null;
-  martin_ratio_1y?: number | null;
-  martin_ratio_3y?: number | null;
   quality_score_1m?: number | null;
   quality_score_ytd?: number | null;
   quality_score_1y?: number | null;
   quality_score_3y?: number | null;
   quality_score_5y?: number | null;
-  switch_destinations_count?: number;
 }
 
 export interface SummaryResponse {
