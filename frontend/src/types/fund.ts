@@ -45,8 +45,11 @@ export interface FundSummary {
   ulcer_index_3y?: number | null;
   martin_ratio_1y?: number | null;
   martin_ratio_3y?: number | null;
+  quality_score_1m?: number | null;
+  quality_score_ytd?: number | null;
   quality_score_1y?: number | null;
   quality_score_3y?: number | null;
+  quality_score_5y?: number | null;
   switch_destinations_count?: number;
 }
 

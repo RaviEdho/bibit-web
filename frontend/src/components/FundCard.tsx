@@ -1,7 +1,7 @@
 import React from "react";
 import { FundSummary } from "../types/fund";
 import { formatAum, formatPercent, formatManagerName } from "../utils/formatters";
-import { TrendingUp, TrendingDown, ShieldAlert, ChevronRight, Zap, Banknote, ArrowRightLeft, Sparkles } from "lucide-react";
+import { TrendingUp, TrendingDown, ChevronRight, Zap, Banknote, ArrowRightLeft, Sparkles } from "lucide-react";
 
 export type ReturnTimeframe = "1d" | "1m" | "ytd" | "1y" | "3y" | "5y";
 
@@ -73,6 +73,30 @@ export const FundCard: React.FC<FundCardProps> = ({ fund, timeframe, onClick, on
       mddLabel = "Drawdown 5 Th";
       break;
   }
+
+  let qualityScore: number | null = null;
+  let qualityLabel = "Skor Kualitas";
+
+  switch (timeframe) {
+    case "1d":
+      qualityScore = null;
+      break;
+    case "1m":
+      qualityScore = fund.quality_score_1m ?? null;
+      break;
+    case "ytd":
+      qualityScore = fund.quality_score_ytd ?? null;
+      break;
+    case "1y":
+      qualityScore = fund.quality_score_1y ?? null;
+      break;
+    case "3y":
+      qualityScore = fund.quality_score_3y ?? null;
+      break;
+    case "5y":
+      qualityScore = fund.quality_score_5y ?? null;
+      break;
+  }
   const isPositive = (returnValue ?? 0) >= 0;
 
   // Type badge styling matching Bibit category palette
@@ -100,7 +124,7 @@ export const FundCard: React.FC<FundCardProps> = ({ fund, timeframe, onClick, on
     >
       {/* Top Header: Badges */}
       <div>
-        <div className="flex flex-wrap items-center gap-1.5 mb-2">
+        <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
           <span
             className={`px-2 py-0.5 rounded-md text-[10px] font-semibold border ${getTypeColor(
               fund.type
@@ -162,11 +186,6 @@ export const FundCard: React.FC<FundCardProps> = ({ fund, timeframe, onClick, on
               <span>Switch</span>
             </button>
           )}
-          {fund.risk_profile && (
-            <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-800 text-slate-400 border border-slate-700/60">
-              {fund.risk_profile}
-            </span>
-          )}
           {fund.notbuyable === 1 && (
             <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-rose-950/80 text-rose-300 border border-rose-800/60">
               Tutup
@@ -180,105 +199,68 @@ export const FundCard: React.FC<FundCardProps> = ({ fund, timeframe, onClick, on
         {/* Fund Title & Manager */}
         <h3 className="font-bold text-base text-white group-hover:text-brand-400 transition-colors leading-snug line-clamp-2">
           {fund.name}
+          <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-brand-400 group-hover:translate-x-0.5 transition-all inline-block ml-1 align-[-2px]" />
         </h3>
-        <p className="text-xs text-slate-400 mt-0.5 truncate">
+        <p className="text-xs text-slate-400 mt-1 truncate">
           {formatManagerName(fund.manager)}
         </p>
       </div>
 
-      {/* Main Metrics Section: Return & Max Drawdown Prominent Tiles */}
-      {(() => {
-        const isZeroMdd = mddValue === null || Math.abs(mddValue) < 0.05;
-
-        return (
-          <div className="my-3.5 pt-3 border-t border-slate-800/70 space-y-2.5">
-            {/* Two Prominent Metric Boxes: Return & Drawdown */}
-            <div className="grid grid-cols-2 gap-2.5">
-              {/* Left: Prominent Return */}
-              <div className="bg-slate-800/50 border border-slate-800 rounded-xl p-2.5 flex flex-col justify-between">
-                <div className="flex items-center gap-1 text-[11px] text-slate-400">
-                  {isPositive ? (
-                    <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
-                  ) : (
-                    <TrendingDown className="w-3.5 h-3.5 text-rose-400" />
-                  )}
-                  <span className="truncate">{returnLabel}</span>
-                </div>
-                <div
-                  className={`text-lg sm:text-xl font-extrabold tracking-tight font-mono mt-1 ${
-                    isPositive ? "text-emerald-400" : "text-rose-400"
-                  }`}
-                >
-                  {formatPercent(returnValue)}
-                </div>
-              </div>
-
-              {/* Right: Prominent Max Drawdown (MDD) */}
-              <div
-                className={`rounded-xl p-2.5 border flex flex-col justify-between transition-colors ${
-                  isZeroMdd
-                    ? "bg-slate-800/20 border-slate-800/50 text-slate-500"
-                    : "bg-rose-950/20 border-rose-900/40 text-rose-400"
-                }`}
-              >
-                <div className="flex items-center gap-1 text-[11px]">
-                  <ShieldAlert
-                    className={`w-3.5 h-3.5 ${
-                      isZeroMdd ? "text-slate-600" : "text-rose-400"
-                    }`}
-                  />
-                  <span
-                    className={`truncate font-medium ${
-                      isZeroMdd ? "text-slate-500" : "text-rose-300"
-                    }`}
-                  >
-                    {mddLabel}
-                  </span>
-                </div>
-                <div
-                  className={`text-lg sm:text-xl font-extrabold tracking-tight font-mono mt-1 ${
-                    isZeroMdd
-                      ? "text-slate-500 opacity-60"
-                      : "text-rose-400"
-                  }`}
-                >
-                  {mddValue !== null ? formatPercent(mddValue, false) : "-"}
-                </div>
-              </div>
+      {/* Main Metrics Section: Return & Quality Score Prominent Tiles */}
+      <div className="mt-3.5 space-y-2.5">
+        {/* Two Prominent Metric Boxes: Return & Quality Score */}
+        <div className="grid grid-cols-2 gap-2.5">
+          {/* Left: Prominent Return */}
+          <div className="bg-slate-800/50 border border-slate-800 rounded-xl p-2.5 sm:p-3 flex flex-col justify-between">
+            <div className="flex items-center gap-1 text-[11px] text-slate-400">
+              {isPositive ? (
+                <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+              ) : (
+                <TrendingDown className="w-3.5 h-3.5 text-rose-400" />
+              )}
+              <span className="truncate">{returnLabel}</span>
             </div>
-
-            {/* Secondary Stats Row: AUM & NAV */}
-            <div className="flex items-center justify-between text-xs px-1 text-slate-400 font-medium">
-              <div>
-                AUM: <span className="text-white font-mono">{formatAum(fund.aum)}</span>
-              </div>
-              <div>
-                NAV:{" "}
-                <span className="text-slate-200 font-mono">
-                  {fund.nav.toLocaleString("id-ID", { minimumFractionDigits: 2 })}
-                </span>
-              </div>
+            <div
+              className={`text-lg sm:text-xl font-extrabold tracking-tight font-mono mt-1 ${
+                isPositive ? "text-emerald-400" : "text-rose-400"
+              }`}
+            >
+              {formatPercent(returnValue)}
             </div>
           </div>
-        );
-      })()}
 
-      {/* Footer Info & Action */}
-      <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-slate-400">
-        <div className="flex items-center gap-2">
-          {fund.quality_score_1y !== null && fund.quality_score_1y !== undefined && (
-            <span className="flex items-center gap-1 text-cyan-300" title="Skor Kualitas 1 Tahun (Kombinasi Sortino & Ulcer Index)">
-              <Sparkles className="w-3 h-3 text-cyan-400" />
-              Skor Kualitas: <strong className="font-mono text-white">{fund.quality_score_1y.toFixed(2)}</strong>
-            </span>
-          )}
+          {/* Right: Prominent Quality Score */}
+          <div className="bg-slate-800/50 border border-slate-800 rounded-xl p-2.5 sm:p-3 flex flex-col justify-between">
+            <div className="flex items-center gap-1 text-[11px] text-cyan-300">
+              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="truncate font-medium">{qualityLabel}</span>
+            </div>
+            <div className="text-lg sm:text-xl font-extrabold tracking-tight font-mono mt-1 text-cyan-300">
+              {qualityScore !== null ? qualityScore.toFixed(2) : "-"}
+            </div>
+          </div>
         </div>
 
-        <div className="flex items-center gap-0.5 text-brand-400 font-semibold group-hover:translate-x-0.5 transition-transform">
-          <span>Grafik</span>
-          <ChevronRight className="w-4 h-4" />
+        {/* Secondary Stats Row: Drawdown (below returns) & AUM (on right) */}
+        <div className="flex items-center justify-between text-xs px-1 text-slate-400 font-medium">
+          <div title={mddLabel}>
+            Drawdown:{" "}
+            <span
+              className={`font-mono font-semibold ${
+                mddValue !== null && Math.abs(mddValue) >= 0.05
+                  ? "text-rose-400"
+                  : "text-slate-400"
+              }`}
+            >
+              {mddValue !== null ? formatPercent(mddValue, false) : "-"}
+            </span>
+          </div>
+          <div>
+            AUM: <span className="text-white font-mono">{formatAum(fund.aum)}</span>
+          </div>
         </div>
       </div>
+
     </div>
   );
 };

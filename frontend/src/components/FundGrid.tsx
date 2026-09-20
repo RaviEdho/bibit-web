@@ -189,8 +189,17 @@ export const FundGrid: React.FC<FundGridProps> = ({ funds, onSelectFund, onOpenS
             };
             return getMdd(b) - getMdd(a);
           }
-          case "quality_desc":
-            return (b.quality_score_1y ?? -999) - (a.quality_score_1y ?? -999);
+          case "quality_desc": {
+            const getQuality = (f: FundSummary) => {
+              if (activeTimeframe === "1m") return f.quality_score_1m ?? -999;
+              if (activeTimeframe === "ytd") return f.quality_score_ytd ?? -999;
+              if (activeTimeframe === "1y") return f.quality_score_1y ?? -999;
+              if (activeTimeframe === "3y") return f.quality_score_3y ?? -999;
+              if (activeTimeframe === "5y") return f.quality_score_5y ?? -999;
+              return f.quality_score_1y ?? -999;
+            };
+            return getQuality(b) - getQuality(a);
+          }
           case "name_asc":
             return a.name.localeCompare(b.name);
           default:

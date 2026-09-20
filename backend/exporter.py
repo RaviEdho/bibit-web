@@ -215,8 +215,11 @@ def export_public_cache(db_path: str, public_dir: str):
             "ulcer_index_3y": m_3y.get("ulcer_index"),
             "martin_ratio_1y": m_1y.get("martin_ratio"),
             "martin_ratio_3y": m_3y.get("martin_ratio"),
+            "quality_score_1m": m_1m.get("quality_score"),
+            "quality_score_ytd": m_ytd.get("quality_score"),
             "quality_score_1y": m_1y.get("quality_score"),
             "quality_score_3y": m_3y.get("quality_score"),
+            "quality_score_5y": m_5y.get("quality_score"),
         })
 
     conn.close()
