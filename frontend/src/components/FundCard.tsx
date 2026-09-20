@@ -1,6 +1,6 @@
 import React from "react";
 import { FundSummary } from "../types/fund";
-import { formatAum, formatPercent, formatCurrency, formatManagerName } from "../utils/formatters";
+import { formatAum, formatPercent, formatManagerName } from "../utils/formatters";
 import { TrendingUp, TrendingDown, ShieldAlert, Activity, ChevronRight, Zap, Banknote, ArrowRightLeft } from "lucide-react";
 
 export type ReturnTimeframe = "1d" | "1m" | "ytd" | "1y" | "3y" | "5y";
@@ -256,15 +256,11 @@ export const FundCard: React.FC<FundCardProps> = ({ fund, timeframe, onClick }) 
       {/* Footer Info & Action */}
       <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-slate-400">
         <div className="flex items-center gap-2">
-          <span>Min: <strong className="text-slate-300 font-mono">{formatCurrency(fund.min_buy)}</strong></span>
           {fund.sharpe_1y !== null && (
-            <>
-              <span>&bull;</span>
-              <span className="flex items-center gap-1 text-blue-300">
-                <Activity className="w-3 h-3" />
-                Sharpe: <strong className="font-mono">{fund.sharpe_1y.toFixed(2)}</strong>
-              </span>
-            </>
+            <span className="flex items-center gap-1 text-blue-300">
+              <Activity className="w-3 h-3" />
+              Sharpe: <strong className="font-mono">{fund.sharpe_1y.toFixed(2)}</strong>
+            </span>
           )}
         </div>
 
