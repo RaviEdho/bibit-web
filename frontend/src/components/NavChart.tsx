@@ -28,6 +28,8 @@ export const NavChart: React.FC<NavChartProps> = ({
   const areaSeriesRef = useRef<ISeriesApi<"Area"> | null>(null);
   const rawLineSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const isProgrammaticChangeRef = useRef<boolean>(true);
+  const animFrameRef = useRef<number | null>(null);
+  const isPointerDownRef = useRef<boolean>(false);
 
   const [activeTimeframe, setActiveTimeframe] = useState<string>("1Y");
   const [isLogScale, setIsLogScale] = useState<boolean>(false);
@@ -36,6 +38,12 @@ export const NavChart: React.FC<NavChartProps> = ({
     isDividend &&
     series.some((p) => p.raw_nav !== undefined && Math.abs(p.raw_nav - p.value) > 0.001)
   );
+
+  const getChartHeight = () => (typeof window !== "undefined" && window.innerWidth < 768 ? 220 : 360);
+  const getScaleMargins = () => {
+    const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+    return isMobile ? { top: 0.12, bottom: 0.14 } : { top: 0.05, bottom: 0.08 };
+  };
 
   const formatDateLocal = (d: Date): string => {
     const year = d.getFullYear();
@@ -89,6 +97,15 @@ export const NavChart: React.FC<NavChartProps> = ({
 
   const applyRange = (fromIdx: number, toIdx: number, isAll: boolean = false) => {
     if (!chartRef.current || !areaSeriesRef.current || !series || series.length === 0) return;
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
+    chartRef.current.priceScale("right").applyOptions({
+      autoScale: true,
+      scaleMargins: getScaleMargins(),
+    });
+
 
     if (!hasDividend) {
       if (isAll || fromIdx <= 0) {
@@ -140,7 +157,7 @@ export const NavChart: React.FC<NavChartProps> = ({
 
     const chart = createChart(containerRef.current, {
       width: containerRef.current.clientWidth,
-      height: 380,
+      height: getChartHeight(),
       layout: {
         background: { type: ColorType.Solid, color: "#0f172a" }, // slate-900
         textColor: "#94a3b8", // slate-400
@@ -167,10 +184,25 @@ export const NavChart: React.FC<NavChartProps> = ({
       rightPriceScale: {
         borderColor: "#334155",
         mode: isLogScale ? PriceScaleMode.Logarithmic : PriceScaleMode.Normal,
+        autoScale: true,
+        scaleMargins: getScaleMargins(),
       },
       timeScale: {
         borderColor: "#334155",
         timeVisible: false,
+      },
+      handleScale: {
+        axisPressedMouseMove: {
+          time: true,
+          price: false,
+        },
+        axisDoubleClickReset: {
+          time: true,
+          price: true,
+        },
+      },
+      handleScroll: {
+        vertTouchDrag: false,
       },
     });
 
@@ -225,13 +257,148 @@ export const NavChart: React.FC<NavChartProps> = ({
       onRangeChange(initialMetrics);
     }
 
-    // Subscribe to pan/zoom/drag range changes
+    const checkAndSnapBack = () => {
+      if (isPointerDownRef.current || !chartRef.current || !series || series.length < 2) return;
+      const timeScale = chartRef.current.timeScale();
+      const logicalRange = timeScale.getVisibleLogicalRange();
+      if (!logicalRange) return;
+
+      const lastIdx = series.length - 1;
+      const currentFrom = logicalRange.from;
+      const currentTo = logicalRange.to;
+      const rangeSpan = currentTo - currentFrom;
+
+      // Detect if chart is scrolled into whitespace or zoomed out past all data
+      const isSquishedRight = currentTo > lastIdx + 0.5;
+      const isSquishedLeft = currentFrom < -0.5;
+      const isZoomedOutPastData = rangeSpan > series.length + 0.5;
+
+      if (!isSquishedRight && !isSquishedLeft && !isZoomedOutPastData) return;
+
+      let targetFrom = 0;
+      let targetTo = lastIdx;
+
+      if (isSquishedRight && !isSquishedLeft) {
+        // Anchor the leftest visible date and snap the rest of the date plots to the right edge
+        const anchorFrom = Math.max(0, Math.floor(currentFrom));
+        targetFrom = Math.min(anchorFrom, lastIdx - 2);
+        targetTo = lastIdx;
+      } else if (isSquishedLeft && !isSquishedRight) {
+        // Anchor the right edge and snap the left edge to the earliest date
+        targetFrom = 0;
+        targetTo = Math.min(lastIdx, Math.max(2, Math.ceil(currentTo)));
+      } else {
+        // Both sides overscrolled (e.g. zoomed out past all data)
+        targetFrom = 0;
+        targetTo = lastIdx;
+      }
+
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+      }
+
+      isProgrammaticChangeRef.current = true;
+      const duration = 140;
+      const startTime = performance.now();
+      const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+
+      const animateStep = (now: number) => {
+        const elapsed = now - startTime;
+        const progress = Math.min(1, elapsed / duration);
+        const eased = easeOutCubic(progress);
+
+        const curFrom = currentFrom + (targetFrom - currentFrom) * eased;
+        const curTo = currentTo + (targetTo - currentTo) * eased;
+
+        timeScale.setVisibleLogicalRange({ from: curFrom, to: curTo });
+
+        if (progress < 1) {
+          animFrameRef.current = requestAnimationFrame(animateStep);
+        } else {
+          animFrameRef.current = null;
+          const finalFrom = Math.max(0, Math.floor(targetFrom));
+          const finalTo = Math.min(lastIdx, Math.ceil(targetTo));
+
+          if (hasDividend) {
+            applyRange(finalFrom, finalTo, finalFrom <= 0 && finalTo >= lastIdx);
+          } else {
+            if (finalFrom <= 0 && finalTo >= lastIdx) {
+              timeScale.fitContent();
+            } else {
+              timeScale.setVisibleLogicalRange({ from: finalFrom, to: finalTo });
+            }
+          }
+
+          if (finalFrom <= 0 && finalTo >= lastIdx) {
+            setActiveTimeframe("ALL");
+          } else {
+            let matchingTf = "";
+            for (const tf of ["1M", "6M", "YTD", "1Y", "3Y", "5Y"]) {
+              if (Math.abs(getStartIndexForTimeframe(tf) - finalFrom) <= 1 && finalTo === lastIdx) {
+                matchingTf = tf;
+                break;
+              }
+            }
+            setActiveTimeframe(matchingTf);
+          }
+
+          setTimeout(() => {
+            isProgrammaticChangeRef.current = false;
+          }, 50);
+
+          if (onRangeChange) {
+            onRangeChange(computeRangeMetrics(series, finalFrom, finalTo));
+          }
+        }
+      };
+      animFrameRef.current = requestAnimationFrame(animateStep);
+    };
+
+    // Pointer and wheel listeners for snap-back on release / scroll settle
+    const onPointerDown = () => {
+      isPointerDownRef.current = true;
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = null;
+      }
+    };
+
+    const onPointerUp = () => {
+      if (isPointerDownRef.current) {
+        isPointerDownRef.current = false;
+        checkAndSnapBack();
+      }
+    };
+
+    let wheelTimer: number | undefined;
+    const onWheel = () => {
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = null;
+      }
+      clearTimeout(wheelTimer);
+      wheelTimer = window.setTimeout(checkAndSnapBack, 80);
+    };
+
+    const container = containerRef.current;
+    if (container) {
+      container.addEventListener("mousedown", onPointerDown);
+      container.addEventListener("touchstart", onPointerDown, { passive: true });
+      container.addEventListener("wheel", onWheel, { passive: true });
+    }
+    window.addEventListener("mouseup", onPointerUp);
+    window.addEventListener("touchend", onPointerUp);
+
+    let rangeChangeDebounce: number | undefined;
     chart.timeScale().subscribeVisibleLogicalRangeChange((logicalRange) => {
       if (!logicalRange || !onRangeChange || series.length < 2) return;
 
-      // If range changed via user drag/zoom, untick preset button to denote custom range
       if (!isProgrammaticChangeRef.current) {
         setActiveTimeframe("");
+        if (!isPointerDownRef.current) {
+          clearTimeout(rangeChangeDebounce);
+          rangeChangeDebounce = window.setTimeout(checkAndSnapBack, 80);
+        }
       }
 
       const fromIdx = Math.max(0, Math.floor(logicalRange.from));
@@ -248,6 +415,10 @@ export const NavChart: React.FC<NavChartProps> = ({
       if (containerRef.current && chartRef.current) {
         chartRef.current.applyOptions({
           width: containerRef.current.clientWidth,
+          height: getChartHeight(),
+        });
+        chartRef.current.priceScale("right").applyOptions({
+          scaleMargins: getScaleMargins(),
         });
       }
     };
@@ -255,6 +426,21 @@ export const NavChart: React.FC<NavChartProps> = ({
     window.addEventListener("resize", handleResize);
 
     return () => {
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = null;
+      }
+      clearTimeout(wheelTimer);
+      clearTimeout(rangeChangeDebounce);
+      if (container) {
+        container.removeEventListener("mousedown", onPointerDown);
+        container.removeEventListener("touchstart", onPointerDown);
+        container.removeEventListener("wheel", onWheel);
+      }
+      window.removeEventListener("mouseup", onPointerUp);
+      window.removeEventListener("touchend", onPointerUp);
+      window.removeEventListener("resize", handleResize);
+
       if (rawLineSeriesRef.current) {
         rawLineSeriesRef.current = null;
       }
@@ -275,6 +461,8 @@ export const NavChart: React.FC<NavChartProps> = ({
     setIsLogScale(nextMode);
     chartRef.current.priceScale("right").applyOptions({
       mode: nextMode ? PriceScaleMode.Logarithmic : PriceScaleMode.Normal,
+      autoScale: true,
+      scaleMargins: getScaleMargins(),
     });
   };
 
@@ -283,6 +471,10 @@ export const NavChart: React.FC<NavChartProps> = ({
     setActiveTimeframe(tf);
     if (!chartRef.current || !series || series.length < 2) return;
 
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
     isProgrammaticChangeRef.current = true;
 
     const fromIndex = getStartIndexForTimeframe(tf);
@@ -303,7 +495,7 @@ export const NavChart: React.FC<NavChartProps> = ({
   const timeframes = ["1M", "6M", "YTD", "1Y", "3Y", "5Y", "ALL"];
 
   return (
-    <div className="w-full bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-lg">
+    <div className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 sm:p-4 shadow-lg">
       {/* Controls Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-800">
         <div className="flex items-center gap-1 bg-slate-800/80 p-1 rounded-lg">
@@ -360,7 +552,17 @@ export const NavChart: React.FC<NavChartProps> = ({
       </div>
 
       {/* Chart Canvas */}
-      <div ref={containerRef} className="w-full relative min-h-[380px]" />
+      <div
+        ref={containerRef}
+        className="w-full relative min-h-[220px] sm:min-h-[360px]"
+        onDoubleClick={() => {
+          chartRef.current?.priceScale("right").applyOptions({
+            autoScale: true,
+            scaleMargins: getScaleMargins(),
+          });
+        }}
+        title="Klik dua kali untuk reset skala"
+      />
     </div>
   );
 };
