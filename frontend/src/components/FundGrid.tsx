@@ -2,17 +2,18 @@ import React, { useState, useMemo } from "react";
 import { FundSummary } from "../types/fund";
 import { FundCard, ReturnTimeframe } from "./FundCard";
 import { FundTable } from "./FundTable";
-import { Search, LayoutGrid, Table, ArrowDownUp, Zap, TrendingUp, Banknote, Moon, ArrowRightLeft } from "lucide-react";
+import { Search, LayoutGrid, Table, ArrowDownUp, Zap, TrendingUp, Banknote, Moon, ArrowRightLeft, Network } from "lucide-react";
 import { formatManagerName } from "../utils/formatters";
 
 interface FundGridProps {
   funds: FundSummary[];
   onSelectFund: (symbol: string) => void;
+  onOpenSwitchGraph?: (symbol?: string) => void;
 }
 
 type SortOption = "quality_desc" | "return_desc" | "aum_desc" | "mdd_asc" | "name_asc";
 
-export const FundGrid: React.FC<FundGridProps> = ({ funds, onSelectFund }) => {
+export const FundGrid: React.FC<FundGridProps> = ({ funds, onSelectFund, onOpenSwitchGraph }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [activeTimeframe, setActiveTimeframe] = useState<ReturnTimeframe>("1y");
@@ -210,19 +211,19 @@ export const FundGrid: React.FC<FundGridProps> = ({ funds, onSelectFund }) => {
             placeholder="Cari nama produk, kode, manajer investasi..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs sm:text-sm text-white placeholder-slate-400 focus:outline-none focus:border-brand-500 transition-colors shadow-inner"
+            className="w-full h-10 pl-10 pr-4 bg-slate-900 border border-slate-800 rounded-xl text-xs sm:text-sm text-white placeholder-slate-400 focus:outline-none focus:border-brand-500 transition-colors shadow-inner"
           />
         </div>
 
         {/* View Mode & Sort Dropdown */}
         <div className="flex items-center gap-2 justify-between sm:justify-end">
           {/* Sort Selector */}
-          <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-300">
-            <ArrowDownUp className="w-3.5 h-3.5 text-slate-400" />
+          <div className="h-10 flex items-center gap-1.5 bg-slate-900 border border-slate-800 rounded-xl px-2.5 sm:px-3 text-xs text-slate-300 min-w-0">
+            <ArrowDownUp className="w-3.5 h-3.5 text-slate-400 shrink-0" />
             <select
               value={sortOption}
               onChange={(e) => setSortOption(e.target.value as SortOption)}
-              className="bg-transparent border-none text-xs text-slate-200 focus:outline-none cursor-pointer"
+              className="bg-transparent border-none text-xs text-slate-200 focus:outline-none cursor-pointer py-1 truncate max-w-[130px] sm:max-w-none"
             >
               <option value="quality_desc" className="bg-slate-900 text-white">Skor Kualitas Tertinggi</option>
               <option value="return_desc" className="bg-slate-900 text-white">Return Tertinggi</option>
@@ -231,12 +232,11 @@ export const FundGrid: React.FC<FundGridProps> = ({ funds, onSelectFund }) => {
               <option value="name_asc" className="bg-slate-900 text-white">Nama (A-Z)</option>
             </select>
           </div>
-
           {/* View Toggle (Cards vs Table) */}
-          <div className="flex items-center bg-slate-900 border border-slate-800 rounded-xl p-1">
+          <div className="h-10 flex items-center bg-slate-900 border border-slate-800 rounded-xl p-1 gap-1">
             <button
               onClick={() => setViewMode("card")}
-              className={`p-1.5 rounded-lg transition-colors ${
+              className={`h-full px-2.5 rounded-lg transition-colors flex items-center justify-center ${
                 viewMode === "card"
                   ? "bg-brand-600 text-white shadow-sm"
                   : "text-slate-400 hover:text-white"
@@ -247,7 +247,7 @@ export const FundGrid: React.FC<FundGridProps> = ({ funds, onSelectFund }) => {
             </button>
             <button
               onClick={() => setViewMode("table")}
-              className={`p-1.5 rounded-lg transition-colors ${
+              className={`h-full px-2.5 rounded-lg transition-colors flex items-center justify-center ${
                 viewMode === "table"
                   ? "bg-brand-600 text-white shadow-sm"
                   : "text-slate-400 hover:text-white"
@@ -257,6 +257,19 @@ export const FundGrid: React.FC<FundGridProps> = ({ funds, onSelectFund }) => {
               <Table className="w-4 h-4" />
             </button>
           </div>
+
+          {/* Switching Graph Button */}
+          {onOpenSwitchGraph && (
+            <button
+              onClick={() => onOpenSwitchGraph()}
+              className="h-10 flex items-center gap-1.5 px-2.5 sm:px-3 rounded-xl bg-cyan-950/80 hover:bg-cyan-900/80 text-cyan-300 border border-cyan-800/80 text-xs font-semibold transition-all shadow-sm hover:border-cyan-700 active:scale-95 whitespace-nowrap shrink-0"
+              title="Buka Peta Jaringan Switching Antar Reksa Dana"
+            >
+              <Network className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+              <span className="hidden sm:inline">Peta Switching</span>
+              <span className="sm:hidden">Switching</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -417,7 +430,7 @@ export const FundGrid: React.FC<FundGridProps> = ({ funds, onSelectFund }) => {
 
       {/* Main Content Area */}
       {viewMode === "table" ? (
-        <FundTable funds={filteredAndSortedFunds} onSelectFund={onSelectFund} />
+        <FundTable funds={filteredAndSortedFunds} onSelectFund={onSelectFund} onOpenSwitchGraph={onOpenSwitchGraph} />
       ) : (
         <>
           {filteredAndSortedFunds.length === 0 ? (
@@ -432,6 +445,7 @@ export const FundGrid: React.FC<FundGridProps> = ({ funds, onSelectFund }) => {
                   fund={fund}
                   timeframe={activeTimeframe}
                   onClick={() => onSelectFund(fund.symbol)}
+                  onOpenSwitchGraph={onOpenSwitchGraph}
                 />
               ))}
             </div>

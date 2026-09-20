@@ -4,7 +4,7 @@ import { FundGrid } from "./components/FundGrid";
 import { FundModal } from "./components/FundModal";
 import { SwitchingGraphModal } from "./components/SwitchingGraphModal";
 import { formatDate } from "./utils/formatters";
-import { TrendingUp, Database, Clock, Sparkles, Network } from "lucide-react";
+import { TrendingUp, Database, Clock, Sparkles } from "lucide-react";
 
 export const App: React.FC = () => {
   const [data, setData] = useState<SummaryResponse | null>(null);
@@ -58,19 +58,6 @@ export const App: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0">
-            <button
-              onClick={() => {
-                setGraphInitialSymbol(null);
-                setIsGraphModalOpen(true);
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-950/80 hover:bg-cyan-900/80 text-cyan-300 border border-cyan-800/80 text-xs font-semibold transition-all shadow-sm hover:border-cyan-700 active:scale-95"
-              title="Buka Peta Jaringan Switching Antar Reksa Dana"
-            >
-              <Network className="w-3.5 h-3.5 text-cyan-400" />
-              <span className="hidden sm:inline">Peta Switching</span>
-              <span className="sm:hidden">Graf</span>
-            </button>
-
             {data && (
               <div className="flex items-center gap-1.5 text-xs text-slate-400">
                 <Clock className="w-3.5 h-3.5 text-slate-500 hidden sm:inline" />
@@ -145,7 +132,14 @@ export const App: React.FC = () => {
 
         {/* Directory Table */}
         {!loading && !error && data && (
-          <FundGrid funds={data.funds} onSelectFund={setSelectedSymbol} />
+          <FundGrid
+            funds={data.funds}
+            onSelectFund={setSelectedSymbol}
+            onOpenSwitchGraph={(symbol) => {
+              setGraphInitialSymbol(symbol || null);
+              setIsGraphModalOpen(true);
+            }}
+          />
         )}
       </main>
 

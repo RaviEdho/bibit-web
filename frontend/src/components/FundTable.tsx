@@ -6,8 +6,8 @@ import { ArrowUpDown, ArrowUp, ArrowDown, Zap, TrendingUp, Banknote, ArrowRightL
 interface FundTableProps {
   funds: FundSummary[];
   onSelectFund: (symbol: string) => void;
+  onOpenSwitchGraph?: (symbol: string) => void;
 }
-
 type SortField =
   | "name"
   | "type"
@@ -24,8 +24,7 @@ type SortField =
   | "martin_ratio_1y"
   | "quality_score_1y"
   | "aum";
-
-export const FundTable: React.FC<FundTableProps> = ({ funds, onSelectFund }) => {
+export const FundTable: React.FC<FundTableProps> = ({ funds, onSelectFund, onOpenSwitchGraph }) => {
   const [sortField, setSortField] = useState<SortField>("aum");
   const [sortAsc, setSortAsc] = useState(false);
 
@@ -215,13 +214,22 @@ export const FundTable: React.FC<FundTableProps> = ({ funds, onSelectFund }) => 
                             </span>
                           )}
                           {(fund.switch_destinations_count ?? 0) > 0 && (
-                            <span
-                              className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-medium bg-cyan-950 text-cyan-300 border border-cyan-800/60 gap-0.5"
-                              title={`Mendukung switching ke ${fund.switch_destinations_count} produk`}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                if (onOpenSwitchGraph) {
+                                  e.stopPropagation();
+                                  onOpenSwitchGraph(fund.symbol);
+                                }
+                              }}
+                              className={`inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-medium bg-cyan-950 text-cyan-300 border border-cyan-800/60 gap-0.5 ${
+                                onOpenSwitchGraph ? "hover:bg-cyan-900 hover:border-cyan-600 cursor-pointer transition-colors" : ""
+                              }`}
+                              title={`Mendukung switching ke ${fund.switch_destinations_count} produk. Klik untuk buka di graf.`}
                             >
                               <ArrowRightLeft className="w-2.5 h-2.5 text-cyan-400" />
                               Switch
-                            </span>
+                            </button>
                           )}
                           {fund.notbuyable === 1 && (
                             <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-semibold bg-rose-950 text-rose-300 border border-rose-800/60">

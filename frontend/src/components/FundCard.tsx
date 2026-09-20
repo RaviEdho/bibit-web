@@ -9,9 +9,10 @@ interface FundCardProps {
   fund: FundSummary;
   timeframe: ReturnTimeframe;
   onClick: () => void;
+  onOpenSwitchGraph?: (symbol: string) => void;
 }
 
-export const FundCard: React.FC<FundCardProps> = ({ fund, timeframe, onClick }) => {
+export const FundCard: React.FC<FundCardProps> = ({ fund, timeframe, onClick, onOpenSwitchGraph }) => {
   // Determine return value and label based on timeframe
   let returnValue: number | null = null;
   let returnLabel = "Return 1 Th";
@@ -144,13 +145,22 @@ export const FundCard: React.FC<FundCardProps> = ({ fund, timeframe, onClick }) 
             </span>
           )}
           {(fund.switch_destinations_count ?? 0) > 0 && (
-            <span
-              className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-cyan-950/80 text-cyan-300 border border-cyan-800/60 flex items-center gap-0.5"
-              title={`Mendukung switching ke ${fund.switch_destinations_count} produk`}
+            <button
+              type="button"
+              onClick={(e) => {
+                if (onOpenSwitchGraph) {
+                  e.stopPropagation();
+                  onOpenSwitchGraph(fund.symbol);
+                }
+              }}
+              className={`px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-cyan-950/80 text-cyan-300 border border-cyan-800/60 flex items-center gap-0.5 ${
+                onOpenSwitchGraph ? "hover:bg-cyan-900 hover:border-cyan-600 cursor-pointer transition-colors" : ""
+              }`}
+              title={`Mendukung switching ke ${fund.switch_destinations_count} produk. Klik untuk buka di graf.`}
             >
               <ArrowRightLeft className="w-2.5 h-2.5 text-cyan-400" />
               <span>Switch</span>
-            </span>
+            </button>
           )}
           {fund.risk_profile && (
             <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-800 text-slate-400 border border-slate-700/60">
