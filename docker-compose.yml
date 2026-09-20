@@ -27,6 +27,7 @@ services:
       - SCHEDULE_HOUR=22
       - SCHEDULE_MINUTE=30
       - SCRAPER_WORKERS=5
+      - ANNUAL_RF=0.025
     volumes:
       - ./data:/app/data
     networks:

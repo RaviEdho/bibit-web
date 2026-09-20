@@ -110,7 +110,7 @@ export const MetricsCards: React.FC<MetricsCardsProps> = ({ metrics }) => {
           <div className="flex items-center justify-between text-xs text-slate-400">
             <span>Sharpe Ratio</span>
             <div className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-mono">
-              Rf 6.0%
+              Rf 2.5%
             </div>
           </div>
           <div

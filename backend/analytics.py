@@ -5,8 +5,11 @@ and Sharpe/Sortino ratios from daily NAV time-series.
 Uses standard library math for high performance and zero external dependencies.
 """
 
+import os
 import math
 from datetime import datetime, date
+
+DEFAULT_ANNUAL_RF = float(os.environ.get("ANNUAL_RF", "0.025"))
 
 
 def calculate_simple_return(start_val: float, end_val: float) -> float:
@@ -43,7 +46,7 @@ def calculate_max_drawdown(nav_series: list[float]) -> float:
 
 def calculate_volatility_and_sharpe(
     nav_series: list[float],
-    annual_rf: float = 0.06
+    annual_rf: float = DEFAULT_ANNUAL_RF
 ) -> tuple[float, float, float]:
     """
     Returns: (annualized_volatility, sharpe_ratio, sortino_ratio)
@@ -86,7 +89,7 @@ def calculate_volatility_and_sharpe(
 def compute_metrics_for_window(
     history: list[dict],
     start_date: str,
-    annual_rf: float = 0.06
+    annual_rf: float = DEFAULT_ANNUAL_RF
 ) -> dict:
     """
     Computes metrics for records on or after start_date.
@@ -125,7 +128,7 @@ def compute_metrics_for_window(
     }
 
 
-def compute_all_presets(history: list[dict], reference_date_str: str | None = None) -> dict:
+def compute_all_presets(history: list[dict], reference_date_str: str | None = None, annual_rf: float = DEFAULT_ANNUAL_RF) -> dict:
     """
     Computes metrics for standard windows: 1D, 1M, 3M, 6M, YTD, 1Y, 3Y, 5Y, MAX.
     history: sorted list of {'date': 'YYYY-MM-DD', 'nav': float, ...}
@@ -153,13 +156,13 @@ def compute_all_presets(history: list[dict], reference_date_str: str | None = No
     d_3y = (ref_date - timedelta(days=3 * 365)).strftime("%Y-%m-%d")
     d_5y = (ref_date - timedelta(days=5 * 365)).strftime("%Y-%m-%d")
 
-    m_1m = compute_metrics_for_window(history, d_1m)
-    m_3m = compute_metrics_for_window(history, d_3m)
-    m_6m = compute_metrics_for_window(history, d_6m)
-    m_ytd = compute_metrics_for_window(history, d_ytd)
-    m_1y = compute_metrics_for_window(history, d_1y)
-    m_3y = compute_metrics_for_window(history, d_3y)
-    m_5y = compute_metrics_for_window(history, d_5y)
+    m_1m = compute_metrics_for_window(history, d_1m, annual_rf)
+    m_3m = compute_metrics_for_window(history, d_3m, annual_rf)
+    m_6m = compute_metrics_for_window(history, d_6m, annual_rf)
+    m_ytd = compute_metrics_for_window(history, d_ytd, annual_rf)
+    m_1y = compute_metrics_for_window(history, d_1y, annual_rf)
+    m_3y = compute_metrics_for_window(history, d_3y, annual_rf)
+    m_5y = compute_metrics_for_window(history, d_5y, annual_rf)
 
     # All-time (Inception)
     d_start = datetime.strptime(history[0]["date"], "%Y-%m-%d")
@@ -170,8 +173,8 @@ def compute_all_presets(history: list[dict], reference_date_str: str | None = No
         "return": round(calculate_simple_return(navs[0], navs[-1]) * 100, 2),
         "cagr": round(calculate_cagr(navs[0], navs[-1], all_days) * 100, 2),
         "max_drawdown": round(calculate_max_drawdown(navs) * 100, 2),
-        "sharpe": round(calculate_volatility_and_sharpe(navs)[1], 2),
-        "volatility": round(calculate_volatility_and_sharpe(navs)[0] * 100, 2)
+        "sharpe": round(calculate_volatility_and_sharpe(navs, annual_rf)[1], 2),
+        "volatility": round(calculate_volatility_and_sharpe(navs, annual_rf)[0] * 100, 2)
     }
 
     return {

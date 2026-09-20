@@ -9,7 +9,7 @@ export function computeRangeMetrics(
   data: NavPoint[],
   startIndex: number,
   endIndex: number,
-  annualRiskFreeRate: number = 0.06 // 6% BI-Rate
+  annualRiskFreeRate: number = 0.025 // 2.5% Net bank deposit benchmark
 ): RangeMetrics | null {
   if (!data || data.length < 2) return null;
 
