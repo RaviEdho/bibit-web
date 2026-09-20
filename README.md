@@ -2,7 +2,7 @@
 
 A mutual fund analytics dashboard and historical daily Net Asset Value (NAV) tracking system for mutual funds listed on [Bibit](https://bibit.id).
 
-This project tracks Indonesian mutual funds (*reksadana*), syncs historical daily NAV time-series data, computes financial return and risk metrics (CAGR, Drawdown, Sharpe Ratio), visualizes fund switching relationships, and serves a modern responsive web dashboard.
+This project tracks Indonesian mutual funds (*reksadana*), syncs historical daily NAV time-series data, computes financial return and risk-adjusted metrics (CAGR, Drawdown, Quality Score, Sortino, Ulcer Index), visualizes fund switching relationships, and serves a modern responsive web dashboard.
 
 ---
 
@@ -11,7 +11,7 @@ This project tracks Indonesian mutual funds (*reksadana*), syncs historical dail
 - **Mutual Fund Catalog & Analytics**:
   - Filter by asset class: Pasar Uang (Money Market), Obligasi (Fixed Income), Saham (Equity), Campuran (Balanced).
   - Sharia (*Syariah*) filter and investment manager/custodian bank tagging.
-  - Key financial metrics: AUM, expense ratio, minimum purchase amount, CAGR, simple return, maximum drawdown, annualized volatility, and Sharpe/Sortino ratios.
+  - Key financial metrics: AUM, expense ratio, minimum purchase amount, CAGR, simple return, maximum drawdown, annualized volatility, Sortino ratio, Ulcer Index, Martin ratio, and multi-timeframe Quality Scores.
 - **Interactive NAV Charts**:
   - Built with TradingView Lightweight Charts for high-performance financial charting.
   - Multi-timeframe views: 1 Month, Year-to-Date (YTD), 1 Year, 3 Years, 5 Years, and All-Time (since inception).
@@ -33,8 +33,9 @@ This project tracks Indonesian mutual funds (*reksadana*), syncs historical dail
 
 ```
 bibit-web/
+├── AGENTS.MD                 # Operational guide, deployment runbooks, and invariants
 ├── backend/                  # Python scraper, analytics engine, and scheduler
-│   ├── analytics.py          # Return & risk calculations (CAGR, Max Drawdown, Sharpe)
+│   ├── analytics.py          # Return & risk calculations (CAGR, Max Drawdown, Quality Score, Ulcer)
 │   ├── bibit_api.py          # HTTP client & decryption for api.bibit.id
 │   ├── exporter.py           # SQLite to static JSON exporter
 │   ├── manager_names.py      # Investment manager name normalization
@@ -76,7 +77,7 @@ bun install     # or npm install
 bun run dev     # or npm run dev
 ```
 
-The frontend development server starts on `http://localhost:5173`. Ensure `data/public` has exported JSON files or mock API responses available at `/api/`.
+The frontend development server starts on `http://localhost:3000`. Ensure `data/public` has exported JSON files or mock API responses available at `/api/`.
 
 ### 2. Backend & Data Scraping
 
@@ -91,11 +92,15 @@ pip install -r backend/requirements.txt
 python3 crawl_bibit.py --db data/bibit.sqlite --workers 5
 ```
 
-#### Run Immediate Sync & Export Public Cache:
+#### Export Public Static Cache (JSON):
 ```bash
-python3 backend/scheduler.py --now
+BIBIT_DB_PATH=data/bibit.sqlite BIBIT_PUBLIC_DIR=data/public python3 backend/exporter.py
 ```
 
+#### Run Immediate Sync & Export Public Cache:
+```bash
+BIBIT_DB_PATH=data/bibit.sqlite BIBIT_PUBLIC_DIR=data/public python3 backend/scheduler.py --now
+```
 #### Sync Switching Matrix (Optional):
 ```bash
 export BIBIT_ACCESS_TOKEN="your_bibit_jwt_token"
@@ -110,10 +115,9 @@ Launch both frontend web server and background scraper worker with Docker Compos
 docker compose up -d --build
 ```
 
-- **Frontend / Static API**: Exposed via port 80 (attached to `gateway_net`).
+- **Frontend / Static API**: Exposed via port 80 attached to `gateway_net` (routed in production via Cloudflare Tunnel at `https://bibit.edho.dev`).
 - **Worker**: Runs `scheduler.py` in the background with persistent SQLite storage in `./data`.
-
----
+- **Operational Runbook**: See [`AGENTS.MD`](AGENTS.MD) for CI/CD setup, container rebuild matrices, and production management via `ssh oracle`.
 
 ## Environment Variables
 

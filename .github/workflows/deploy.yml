@@ -29,7 +29,10 @@ jobs:
             docker compose build
             docker compose up -d --remove-orphans
 
-            # 3. Prune old unused images to save disk space
+            # 3. Re-export static cache so new schema fields appear immediately
+            docker compose exec -T worker python exporter.py
+
+            # 4. Prune old unused images to save disk space
             docker image prune -f
 
             echo "✅ Bibit Web deployment completed successfully!"

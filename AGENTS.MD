@@ -148,9 +148,9 @@ Pushes to the `main` branch trigger `.github/workflows/deploy.yml`:
    git reset --hard origin/main
    docker compose build
    docker compose up -d --remove-orphans
+   docker compose exec -T worker python exporter.py
    docker image prune -f
    ```
-
 ### Manual Production Operations via SSH
 
 Connect directly:
@@ -168,8 +168,10 @@ ssh oracle "cd bibit-web && docker compose logs -f web"
 ssh oracle "cd bibit-web && docker compose logs -f worker"
 
 # Trigger an immediate manual data sync on production
-ssh oracle "cd bibit-web && docker compose exec bibit-worker python backend/scheduler.py --now"
+ssh oracle "cd bibit-web && docker compose exec bibit-worker python scheduler.py --now"
 
+# Trigger an immediate static cache export on production
+ssh oracle "cd bibit-web && docker compose exec bibit-worker python exporter.py"
 # Inspect data file freshness and SQLite size
 ssh oracle "cd bibit-web && ls -lh data/ data/public/"
 ```
