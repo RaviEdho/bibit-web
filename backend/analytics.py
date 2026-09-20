@@ -44,16 +44,72 @@ def calculate_max_drawdown(nav_series: list[float]) -> float:
                 max_dd = dd
     return max_dd
 
+def calculate_ulcer_index(
+    nav_series: list[float],
+    annual_rf: float = DEFAULT_ANNUAL_RF
+) -> tuple[float, float]:
+    """
+    Calculates Ulcer Index (UI) and Martin Ratio (Ulcer Performance Index - UPI).
+    Ulcer Index measures depth and duration of drawdowns:
+      UI = sqrt( (1/m) * sum(drawdown_i^2) )
+    Martin Ratio evaluates excess return relative to ulcer index:
+      Martin = (Return - Rf) / max(UI, 0.05)
+    Returns: (ulcer_index, martin_ratio)
+    """
+    m = len(nav_series)
+    if m < 2:
+        return 0.0, 0.0
+
+    peak = nav_series[0]
+    drawdowns = []
+    for v in nav_series:
+        if v > peak:
+            peak = v
+        dd = (v - peak) / peak * 100 if peak > 0 else 0.0
+        drawdowns.append(dd)
+
+    ui = math.sqrt(sum(d ** 2 for d in drawdowns) / m)
+
+    ret_pct = ((nav_series[-1] - nav_series[0]) / nav_series[0] * 100) if nav_series[0] > 0 else 0.0
+    excess_pct = ret_pct - (annual_rf * 100)
+    eff_ui = max(ui, 0.05)
+    martin = excess_pct / eff_ui
+
+    return ui, martin
+
+def calculate_quality_score(
+    excess_return_pct: float,
+    ulcer_index: float,
+    max_drawdown_pct: float
+) -> float:
+    """
+    Calculates 'Skor Kualitas' (Quality Score):
+    Directly rewards higher returns while penalizing real capital pain (drawdown depth & duration).
+    Allows high-return funds with tiny, quick dips (like Sucorinvest Sharia Balanced)
+    to beat lower-return zero-drawdown funds, while heavily suppressing deep crashes.
+
+    Pain Index = 0.25 + Ulcer Index + 0.10 * abs(MDD) + 0.03 * (abs(MDD) ** 2)
+    Score = Excess Return / Pain Index (if excess >= 0)
+    """
+    mdd_val = abs(max_drawdown_pct)
+    ui_val = max(0.0, ulcer_index)
+    pain_index = 0.25 + ui_val + (0.10 * mdd_val) + (0.03 * (mdd_val ** 2))
+
+    if excess_return_pct >= 0:
+        return excess_return_pct / pain_index
+    else:
+        return excess_return_pct * (1.0 + pain_index)
+
 def calculate_volatility_and_sharpe(
     nav_series: list[float],
     annual_rf: float = DEFAULT_ANNUAL_RF
-) -> tuple[float, float, float]:
+) -> tuple[float, float, float, float]:
     """
-    Returns: (annualized_volatility, sharpe_ratio, sortino_ratio)
+    Returns: (annualized_volatility, sharpe_ratio, sortino_ratio, downside_volatility)
     """
     n = len(nav_series)
     if n < 2:
-        return 0.0, 0.0, 0.0
+        return 0.0, 0.0, 0.0, 0.0
 
     daily_returns = []
     for i in range(1, n):
@@ -64,7 +120,7 @@ def calculate_volatility_and_sharpe(
 
     m = len(daily_returns)
     if m == 0:
-        return 0.0, 0.0, 0.0
+        return 0.0, 0.0, 0.0, 0.0
 
     mean_daily = sum(daily_returns) / m
     var = sum((r - mean_daily) ** 2 for r in daily_returns) / m
@@ -77,13 +133,14 @@ def calculate_volatility_and_sharpe(
     # Sharpe ratio
     sharpe = (excess_daily / std_daily) * math.sqrt(252) if std_daily > 0 else 0.0
 
-    # Downside deviation for Sortino
-    downside_diffs = [min(0.0, r - daily_rf) ** 2 for r in daily_returns]
+    # Downside deviation for Sortino (semi-deviation below mean, ignoring upward coupon/gain jumps)
+    downside_diffs = [min(0.0, r - mean_daily) ** 2 for r in daily_returns]
     downside_var = sum(downside_diffs) / m
     downside_std = math.sqrt(downside_var)
+    downside_vol = downside_std * math.sqrt(252)
     sortino = (excess_daily / downside_std) * math.sqrt(252) if downside_std > 0 else 0.0
 
-    return annualized_vol, sharpe, sortino
+    return annualized_vol, sharpe, sortino, downside_vol
 
 
 def compute_metrics_for_window(
@@ -124,14 +181,21 @@ def compute_metrics_for_window(
     s_ret = calculate_simple_return(navs[0], navs[-1])
     cagr = calculate_cagr(navs[0], navs[-1], calendar_days)
     mdd = calculate_max_drawdown(navs)
-    vol, sharpe, _ = calculate_volatility_and_sharpe(navs, annual_rf)
-
+    vol, sharpe, sortino, downside_vol = calculate_volatility_and_sharpe(navs, annual_rf)
+    ui, martin = calculate_ulcer_index(navs, annual_rf)
+    excess_pct = (cagr * 100 - annual_rf * 100) if calendar_days >= 365 else (s_ret * 100 - annual_rf * 100)
+    qs = calculate_quality_score(excess_pct, ui, mdd * 100)
     return {
         "return": round(s_ret * 100, 2),
         "cagr": round(cagr * 100, 2),
         "max_drawdown": round(mdd * 100, 2),
         "sharpe": round(sharpe, 2),
-        "volatility": round(vol * 100, 2)
+        "sortino": round(sortino, 2),
+        "volatility": round(vol * 100, 2),
+        "downside_volatility": round(downside_vol * 100, 2),
+        "ulcer_index": round(ui, 2),
+        "martin_ratio": round(martin, 2),
+        "quality_score": round(qs, 2),
     }
 
 
@@ -192,12 +256,23 @@ def compute_all_presets(history: list[dict], reference_date_str: str | None = No
     d_end = datetime.strptime(history[-1]["date"], "%Y-%m-%d")
     all_days = max(1, (d_end - d_start).days)
     navs = [p["nav"] for p in history]
+    vol_all, sharpe_all, sortino_all, downside_vol_all = calculate_volatility_and_sharpe(navs, annual_rf)
+    ui_all, martin_all = calculate_ulcer_index(navs, annual_rf)
     m_all = {
         "return": round(calculate_simple_return(navs[0], navs[-1]) * 100, 2),
         "cagr": round(calculate_cagr(navs[0], navs[-1], all_days) * 100, 2),
         "max_drawdown": round(calculate_max_drawdown(navs) * 100, 2),
-        "sharpe": round(calculate_volatility_and_sharpe(navs, annual_rf)[1], 2),
-        "volatility": round(calculate_volatility_and_sharpe(navs, annual_rf)[0] * 100, 2)
+        "sharpe": round(sharpe_all, 2),
+        "sortino": round(sortino_all, 2),
+        "volatility": round(vol_all * 100, 2),
+        "downside_volatility": round(downside_vol_all * 100, 2),
+        "ulcer_index": round(ui_all, 2),
+        "martin_ratio": round(martin_all, 2),
+        "quality_score": round(calculate_quality_score(
+            calculate_cagr(navs[0], navs[-1], all_days) * 100 - annual_rf * 100,
+            ui_all,
+            calculate_max_drawdown(navs) * 100
+        ), 2),
     }
 
     return {

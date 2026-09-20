@@ -207,7 +207,16 @@ def export_public_cache(db_path: str, public_dir: str):
             "max_drawdown_all": m_all.get("max_drawdown"),
             "sharpe_1y": m_1y.get("sharpe"),
             "sharpe_3y": m_3y.get("sharpe"),
-            "volatility_1y": m_1y.get("volatility")
+            "sortino_1y": m_1y.get("sortino"),
+            "sortino_3y": m_3y.get("sortino"),
+            "volatility_1y": m_1y.get("volatility"),
+            "downside_volatility_1y": m_1y.get("downside_volatility"),
+            "ulcer_index_1y": m_1y.get("ulcer_index"),
+            "ulcer_index_3y": m_3y.get("ulcer_index"),
+            "martin_ratio_1y": m_1y.get("martin_ratio"),
+            "martin_ratio_3y": m_3y.get("martin_ratio"),
+            "quality_score_1y": m_1y.get("quality_score"),
+            "quality_score_3y": m_3y.get("quality_score"),
         })
 
     conn.close()

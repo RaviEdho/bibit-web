@@ -37,7 +37,16 @@ export interface FundSummary {
   max_drawdown_all: number | null;
   sharpe_1y: number | null;
   sharpe_3y: number | null;
+  sortino_1y?: number | null;
+  sortino_3y?: number | null;
   volatility_1y: number | null;
+  downside_volatility_1y?: number | null;
+  ulcer_index_1y?: number | null;
+  ulcer_index_3y?: number | null;
+  martin_ratio_1y?: number | null;
+  martin_ratio_3y?: number | null;
+  quality_score_1y?: number | null;
+  quality_score_3y?: number | null;
   switch_destinations_count?: number;
 }
 
@@ -59,8 +68,14 @@ export interface WindowMetric {
   cagr: number | null;
   max_drawdown: number | null;
   sharpe: number | null;
+  sortino?: number | null;
   volatility: number | null;
+  downside_volatility?: number | null;
+  ulcer_index?: number | null;
+  martin_ratio?: number | null;
+  quality_score?: number | null;
 }
+
 export interface SwitchDestination {
   symbol: string;
   name: string;
@@ -115,9 +130,13 @@ export interface RangeMetrics {
   cagr: number;
   maxDrawdown: number;
   volatilityAnnualized: number;
+  downsideVolatility: number;
   sharpeRatio: number;
+  sortinoRatio: number;
+  ulcerIndex: number;
+  martinRatio: number;
+  qualityScore: number;
 }
-
 export interface GraphNode {
   symbol: string;
   name: string;

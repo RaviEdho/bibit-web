@@ -10,13 +10,13 @@ interface FundGridProps {
   onSelectFund: (symbol: string) => void;
 }
 
-type SortOption = "aum_desc" | "return_desc" | "mdd_asc" | "sharpe_desc" | "name_asc";
+type SortOption = "quality_desc" | "return_desc" | "aum_desc" | "mdd_asc" | "name_asc";
 
 export const FundGrid: React.FC<FundGridProps> = ({ funds, onSelectFund }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [activeTimeframe, setActiveTimeframe] = useState<ReturnTimeframe>("1y");
-  const [sortOption, setSortOption] = useState<SortOption>("aum_desc");
+  const [sortOption, setSortOption] = useState<SortOption>("quality_desc");
   const [viewMode, setViewMode] = useState<"card" | "table">("card");
   const [onlyTradable, setOnlyTradable] = useState<boolean>(true);
   const [onlySyariah, setOnlySyariah] = useState<boolean>(false);
@@ -188,8 +188,8 @@ export const FundGrid: React.FC<FundGridProps> = ({ funds, onSelectFund }) => {
             };
             return getMdd(b) - getMdd(a);
           }
-          case "sharpe_desc":
-            return (b.sharpe_1y ?? -99) - (a.sharpe_1y ?? -99);
+          case "quality_desc":
+            return (b.quality_score_1y ?? -999) - (a.quality_score_1y ?? -999);
           case "name_asc":
             return a.name.localeCompare(b.name);
           default:
@@ -224,9 +224,9 @@ export const FundGrid: React.FC<FundGridProps> = ({ funds, onSelectFund }) => {
               onChange={(e) => setSortOption(e.target.value as SortOption)}
               className="bg-transparent border-none text-xs text-slate-200 focus:outline-none cursor-pointer"
             >
-              <option value="aum_desc" className="bg-slate-900 text-white">AUM Terbesar</option>
+              <option value="quality_desc" className="bg-slate-900 text-white">Skor Kualitas Tertinggi</option>
               <option value="return_desc" className="bg-slate-900 text-white">Return Tertinggi</option>
-              <option value="sharpe_desc" className="bg-slate-900 text-white">Sharpe Tertinggi</option>
+              <option value="aum_desc" className="bg-slate-900 text-white">AUM Terbesar</option>
               <option value="mdd_asc" className="bg-slate-900 text-white">Drawdown Terendah</option>
               <option value="name_asc" className="bg-slate-900 text-white">Nama (A-Z)</option>
             </select>

@@ -105,27 +105,27 @@ export const MetricsCards: React.FC<MetricsCardsProps> = ({ metrics }) => {
           );
         })()}
 
-        {/* Sharpe Ratio */}
+        {/* Skor Kualitas Card */}
         <div className="bg-slate-800/70 border border-slate-700/60 rounded-xl p-3.5 flex flex-col justify-between">
           <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>Sharpe Ratio</span>
-            <div className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-mono">
-              Rf 2.5%
+            <span>Skor Kualitas</span>
+            <div className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-mono" title="Kombinasi Sortino ÷ (1 + Ulcer Index)">
+              Sortino ÷ Ulcer
             </div>
           </div>
           <div
             className={`text-xl font-bold tracking-tight mt-1 ${
-              metrics.sharpeRatio >= 1
-                ? "text-blue-400"
-                : metrics.sharpeRatio >= 0
-                ? "text-slate-200"
+              metrics.qualityScore >= 15
+                ? "text-emerald-400"
+                : metrics.qualityScore >= 0
+                ? "text-cyan-300"
                 : "text-rose-400"
             }`}
           >
-            {metrics.sharpeRatio.toFixed(2)}
+            {metrics.qualityScore.toFixed(2)}
           </div>
-          <span className="text-[11px] text-slate-500 mt-0.5">
-            Volatilitas: {formatPercent(metrics.volatilityAnnualized, false)}
+          <span className="text-[11px] text-slate-400 mt-0.5" title="Sortino Ratio dan Ulcer Index">
+            Sortino: <strong className="text-slate-200 font-mono">{metrics.sortinoRatio.toFixed(2)}</strong> &bull; Ulcer: <strong className="text-slate-200 font-mono">{metrics.ulcerIndex.toFixed(2)}%</strong>
           </span>
         </div>
       </div>

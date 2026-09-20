@@ -19,6 +19,10 @@ type SortField =
   | "cagr_3y"
   | "max_drawdown_1y"
   | "sharpe_1y"
+  | "sortino_1y"
+  | "ulcer_index_1y"
+  | "martin_ratio_1y"
+  | "quality_score_1y"
   | "aum";
 
 export const FundTable: React.FC<FundTableProps> = ({ funds, onSelectFund }) => {
@@ -133,12 +137,13 @@ export const FundTable: React.FC<FundTableProps> = ({ funds, onSelectFund }) => 
                 </div>
               </th>
               <th
-                onClick={() => handleSort("sharpe_1y")}
+                onClick={() => handleSort("quality_score_1y")}
                 className="py-3 px-3 text-right cursor-pointer hover:text-white transition-colors group hidden lg:table-cell"
+                title="Skor Kualitas 1 Tahun (Kombinasi Sortino & Ulcer Index)"
               >
                 <div className="flex items-center justify-end gap-1.5">
-                  <span>1Y Sharpe</span>
-                  {renderSortIcon("sharpe_1y")}
+                  <span>Skor Kualitas</span>
+                  {renderSortIcon("quality_score_1y")}
                 </div>
               </th>
               <th
@@ -310,9 +315,9 @@ export const FundTable: React.FC<FundTableProps> = ({ funds, onSelectFund }) => 
                         : "-"}
                     </td>
 
-                    {/* 1Y Sharpe */}
-                    <td className="py-3 px-3 text-right font-mono text-blue-300 hidden lg:table-cell">
-                      {fund.sharpe_1y !== null ? fund.sharpe_1y.toFixed(2) : "-"}
+                    {/* 1Y Skor Kualitas */}
+                    <td className="py-3 px-3 text-right font-mono text-cyan-300 font-semibold hidden lg:table-cell" title="Skor Kualitas 1 Tahun">
+                      {fund.quality_score_1y !== null && fund.quality_score_1y !== undefined ? fund.quality_score_1y.toFixed(2) : "-"}
                     </td>
 
                     {/* AUM */}
