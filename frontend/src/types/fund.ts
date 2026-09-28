@@ -132,6 +132,7 @@ export interface GraphNode {
   instant_type?: number | null;
   risk_profile: string | null;
   min_buy: number | null;
+  return_1y?: number | null;
   out_count: number;
   in_count: number;
   destinations: string[];

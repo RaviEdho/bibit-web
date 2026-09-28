@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef } from "react";
-import { SwitchingGraphResponse, GraphNode } from "../types/fund";
-import { formatAum, formatCurrency, formatManagerName } from "../utils/formatters";
+import { SwitchingGraphResponse, GraphNode, FundSummary } from "../types/fund";
+import { formatAum, formatCurrency, formatManagerName, formatPercent } from "../utils/formatters";
 import { X, ArrowRightLeft, Search, Building2, ExternalLink, Network, ListTree, Sparkles, ChevronUp, ChevronDown, Zap, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
 
 interface SwitchingGraphModalProps {
@@ -8,6 +8,7 @@ interface SwitchingGraphModalProps {
   onClose: () => void;
   onSelectFund: (symbol: string) => void;
   initialSymbol?: string | null;
+  funds?: FundSummary[];
 }
 
 const TYPE_COLORS: Record<string, { bg: string; border: string; text: string; fill: string }> = {
@@ -45,6 +46,7 @@ export const SwitchingGraphModal: React.FC<SwitchingGraphModalProps> = ({
   onClose,
   onSelectFund,
   initialSymbol,
+  funds,
 }) => {
   const [data, setData] = useState<SwitchingGraphResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -317,6 +319,26 @@ export const SwitchingGraphModal: React.FC<SwitchingGraphModalProps> = ({
     if (!sym || !data) return null;
     return data.nodes.find((n) => n.symbol === sym) || null;
   }, [hoveredSymbol, selectedSymbol, data]);
+
+  const fundsMap = useMemo(() => {
+    if (!funds) return new Map<string, FundSummary>();
+    return new Map(funds.map((f) => [f.symbol, f]));
+  }, [funds]);
+
+  const getNodeReturn1y = (node: GraphNode | null | undefined): number | null | undefined => {
+    if (!node) return undefined;
+    if (node.return_1y !== undefined && node.return_1y !== null) return node.return_1y;
+    return fundsMap.get(node.symbol)?.return_1y;
+  };
+
+  const getReturnColor = (val: number | null | undefined) => {
+    if (val === null || val === undefined || isNaN(val)) return "text-slate-400";
+    if (val > 0) return "text-emerald-400";
+    if (val < 0) return "text-rose-400";
+    return "text-slate-300";
+  };
+
+  const inspectReturn1y = useMemo(() => getNodeReturn1y(inspectNode), [inspectNode, fundsMap]);
 
   // SVG Geometry calculations for circular network graph
   const graphDimensions = 720;
@@ -948,15 +970,26 @@ export const SwitchingGraphModal: React.FC<SwitchingGraphModalProps> = ({
                       />
                       <text
                         x={center}
-                        y={center - 13}
+                        y={activeFocusSymbol && inspectReturn1y !== undefined && inspectReturn1y !== null ? center - 18 : center - 13}
                         textAnchor="middle"
                         className="text-[11px] font-bold fill-slate-200 uppercase tracking-wider"
                       >
                         {activeFocusSymbol ? activeFocusSymbol : `${activeManager.funds.length} Produk`}
                       </text>
+                      {activeFocusSymbol && inspectReturn1y !== undefined && inspectReturn1y !== null && (
+                        <text
+                          x={center}
+                          y={center - 3}
+                          textAnchor="middle"
+                          className="text-[10px] font-mono font-bold"
+                          fill={inspectReturn1y >= 0 ? "#34d399" : "#fb7185"}
+                        >
+                          1T: {formatPercent(inspectReturn1y)}
+                        </text>
+                      )}
                       <text
                         x={center}
-                        y={center + 8}
+                        y={activeFocusSymbol && inspectReturn1y !== undefined && inspectReturn1y !== null ? center + 11 : center + 8}
                         textAnchor="middle"
                         className="text-[10px] font-mono font-bold"
                         fill={isTargetMode ? "#06b6d4" : "#a855f7"}
@@ -969,7 +1002,7 @@ export const SwitchingGraphModal: React.FC<SwitchingGraphModalProps> = ({
                       </text>
                       <text
                         x={center}
-                        y={center + 24}
+                        y={activeFocusSymbol && inspectReturn1y !== undefined && inspectReturn1y !== null ? center + 26 : center + 24}
                         textAnchor="middle"
                         className="text-[8.5px] fill-slate-400 font-medium"
                       >
@@ -1100,6 +1133,15 @@ export const SwitchingGraphModal: React.FC<SwitchingGraphModalProps> = ({
                                   <span>Instan</span>
                                 </span>
                               )}
+                              {(() => {
+                                const ret = getNodeReturn1y(fund);
+                                if (ret === undefined || ret === null) return null;
+                                return (
+                                  <span className={`text-[10px] font-mono font-semibold ${getReturnColor(ret)}`}>
+                                    1T: {formatPercent(ret)}
+                                  </span>
+                                );
+                              })()}
                             </div>
                             <h4 className="text-xs font-semibold text-white mt-1 leading-snug">
                               {fund.name}
@@ -1179,6 +1221,14 @@ export const SwitchingGraphModal: React.FC<SwitchingGraphModalProps> = ({
                         <span style={{ color: getTypeColor(inspectNode.type).border }} className="font-semibold">
                           {focusMode === "targets" ? `${inspectNode.out_count} target` : `${incomingSenders.length} sumber`}
                         </span>
+                        {inspectReturn1y !== undefined && inspectReturn1y !== null && (
+                          <>
+                            <span>&bull;</span>
+                            <span className={`font-mono font-semibold ${getReturnColor(inspectReturn1y)}`}>
+                              1T: {formatPercent(inspectReturn1y)}
+                            </span>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1222,17 +1272,23 @@ export const SwitchingGraphModal: React.FC<SwitchingGraphModalProps> = ({
                 {/* Expanded Bottom Drawer on Mobile */}
                 {isMobileExpanded && (
                   <div className="border-t border-slate-800 p-3 max-h-[38vh] overflow-y-auto space-y-2.5 bg-slate-900/90">
-                    <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="grid grid-cols-3 gap-2 text-xs">
                       <div className="bg-slate-800/60 rounded-lg p-2 border border-slate-800">
                         <div className="text-[10px] text-slate-500">NAV Terakhir</div>
-                        <div className="font-semibold text-white mt-0.5">
+                        <div className="font-semibold text-white mt-0.5 truncate">
                           {formatCurrency(inspectNode.nav)}
                         </div>
                       </div>
                       <div className="bg-slate-800/60 rounded-lg p-2 border border-slate-800">
                         <div className="text-[10px] text-slate-500">Total AUM</div>
-                        <div className="font-semibold text-white mt-0.5">
+                        <div className="font-semibold text-white mt-0.5 truncate">
                           {formatAum(inspectNode.aum)}
+                        </div>
+                      </div>
+                      <div className="bg-slate-800/60 rounded-lg p-2 border border-slate-800">
+                        <div className="text-[10px] text-slate-500">Return 1 Th</div>
+                        <div className={`font-semibold font-mono mt-0.5 truncate ${getReturnColor(inspectReturn1y)}`}>
+                          {formatPercent(inspectReturn1y)}
                         </div>
                       </div>
                     </div>
@@ -1275,6 +1331,7 @@ export const SwitchingGraphModal: React.FC<SwitchingGraphModalProps> = ({
                       <div className="max-h-32 overflow-y-auto space-y-1 pr-1">
                         {(focusMode === "targets" ? inspectNode.destinations : incomingSenders.map((s) => s.symbol)).map((relSymbol) => {
                           const relNode = data?.nodes.find((n) => n.symbol === relSymbol);
+                          const relReturn = getNodeReturn1y(relNode);
                           return (
                             <div
                               key={relSymbol}
@@ -1293,9 +1350,16 @@ export const SwitchingGraphModal: React.FC<SwitchingGraphModalProps> = ({
                                   {relSymbol}
                                 </div>
                               </div>
-                              <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-700/60 text-slate-300 shrink-0">
-                                {relNode?.type || "-"}
-                              </span>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                {relReturn !== undefined && relReturn !== null && (
+                                  <span className={`text-[10px] font-mono font-medium ${getReturnColor(relReturn)}`}>
+                                    {formatPercent(relReturn)}
+                                  </span>
+                                )}
+                                <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-700/60 text-slate-300">
+                                  {relNode?.type || "-"}
+                                </span>
+                              </div>
                             </div>
                           );
                         })}
@@ -1372,17 +1436,23 @@ export const SwitchingGraphModal: React.FC<SwitchingGraphModalProps> = ({
                 </div>
 
                 {/* Metrics Pill Grid */}
-                <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="grid grid-cols-3 gap-2 text-xs">
                   <div className="bg-slate-800/60 rounded-lg p-2 border border-slate-800">
                     <div className="text-[10px] text-slate-500">NAV Terakhir</div>
-                    <div className="font-semibold text-white mt-0.5">
+                    <div className="font-semibold text-white mt-0.5 truncate">
                       {formatCurrency(inspectNode.nav)}
                     </div>
                   </div>
                   <div className="bg-slate-800/60 rounded-lg p-2 border border-slate-800">
                     <div className="text-[10px] text-slate-500">Total AUM</div>
-                    <div className="font-semibold text-white mt-0.5">
+                    <div className="font-semibold text-white mt-0.5 truncate">
                       {formatAum(inspectNode.aum)}
+                    </div>
+                  </div>
+                  <div className="bg-slate-800/60 rounded-lg p-2 border border-slate-800">
+                    <div className="text-[10px] text-slate-500">Return 1 Th</div>
+                    <div className={`font-semibold font-mono mt-0.5 truncate ${getReturnColor(inspectReturn1y)}`}>
+                      {formatPercent(inspectReturn1y)}
                     </div>
                   </div>
                 </div>
@@ -1450,6 +1520,7 @@ export const SwitchingGraphModal: React.FC<SwitchingGraphModalProps> = ({
                     {(focusMode === "targets" ? inspectNode.destinations : incomingSenders.map((s) => s.symbol)).map(
                       (relSymbol) => {
                         const relNode = data?.nodes.find((n) => n.symbol === relSymbol);
+                        const relReturn = getNodeReturn1y(relNode);
                         return (
                           <div
                             key={relSymbol}
@@ -1468,9 +1539,16 @@ export const SwitchingGraphModal: React.FC<SwitchingGraphModalProps> = ({
                                 {relSymbol}
                               </div>
                             </div>
-                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-700/60 text-slate-300 shrink-0">
-                              {relNode?.type || "-"}
-                            </span>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {relReturn !== undefined && relReturn !== null && (
+                                <span className={`text-[10px] font-mono font-medium ${getReturnColor(relReturn)}`}>
+                                  {formatPercent(relReturn)}
+                                </span>
+                              )}
+                              <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-700/60 text-slate-300">
+                                {relNode?.type || "-"}
+                              </span>
+                            </div>
                           </div>
                         );
                       }

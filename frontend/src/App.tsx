@@ -149,6 +149,7 @@ export const App: React.FC = () => {
         onClose={() => setIsGraphModalOpen(false)}
         onSelectFund={setSelectedSymbol}
         initialSymbol={graphInitialSymbol}
+        funds={data?.funds}
       />
 
       {/* Fund Modal Drawer */}

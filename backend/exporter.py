@@ -224,14 +224,27 @@ def export_public_cache(db_path: str, public_dir: str):
     print(f"[+] Successfully exported {len(summary_list)} funds ({total_points:,} points) to {public_dir}")
 
     # Export switching network graph JSON
-    export_switching_graph(db_path, public_dir)
+    returns_1y = {s["symbol"]: s.get("return_1y") for s in summary_list}
+    export_switching_graph(db_path, public_dir, returns_1y=returns_1y)
 
 
-def export_switching_graph(db_path: str, public_dir: str):
+def export_switching_graph(db_path: str, public_dir: str, returns_1y: dict | None = None):
     """
     Exports public_dir/switching_graph.json containing full graph of switchable funds,
     their connections, and clustering by Investment Manager.
     """
+    if returns_1y is None:
+        returns_1y = {}
+        summary_file = os.path.join(public_dir, "summary.json")
+        if os.path.exists(summary_file):
+            try:
+                with open(summary_file, "r", encoding="utf-8") as f:
+                    sdata = json.load(f)
+                    for item in sdata.get("funds", []):
+                        if "symbol" in item and "return_1y" in item:
+                            returns_1y[item["symbol"]] = item["return_1y"]
+            except Exception as e:
+                print(f"[!] Warning: failed to read summary.json for 1y returns: {e}")
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
 
@@ -293,6 +306,7 @@ def export_switching_graph(db_path: str, public_dir: str):
             "instant_type": instant_type,
             "risk_profile": risk,
             "min_buy": min_buy,
+            "return_1y": returns_1y.get(sym) if returns_1y else None,
             "out_count": len(adj.get(sym, [])),
             "in_count": len(in_adj.get(sym, [])),
             "destinations": adj.get(sym, [])
