@@ -92,6 +92,16 @@ export const SwitchingGraphModal: React.FC<SwitchingGraphModalProps> = ({
   const hasMovedRef = useRef(false);
   const touchDistanceRef = useRef<number | null>(null);
   const touchStartZoomRef = useRef(1);
+  const rafPanRef = useRef<number | null>(null);
+
+  // Clean up RAF on unmount
+  useEffect(() => {
+    return () => {
+      if (rafPanRef.current !== null) {
+        cancelAnimationFrame(rafPanRef.current);
+      }
+    };
+  }, []);
 
   // Reset pan & zoom when switching manager
   useEffect(() => {
@@ -138,14 +148,23 @@ export const SwitchingGraphModal: React.FC<SwitchingGraphModalProps> = ({
     if (Math.hypot(dx, dy) > 4) {
       hasMovedRef.current = true;
     }
-    setPan({
-      x: panStartRef.current.x + dx,
-      y: panStartRef.current.y + dy,
-    });
+    const nextX = panStartRef.current.x + dx;
+    const nextY = panStartRef.current.y + dy;
+
+    if (rafPanRef.current === null) {
+      rafPanRef.current = requestAnimationFrame(() => {
+        rafPanRef.current = null;
+        setPan({ x: nextX, y: nextY });
+      });
+    }
   };
 
   const handleMouseUp = () => {
     isDraggingRef.current = false;
+    if (rafPanRef.current !== null) {
+      cancelAnimationFrame(rafPanRef.current);
+      rafPanRef.current = null;
+    }
   };
 
   // Touch handlers for mobile pan & pinch-to-zoom
@@ -181,10 +200,14 @@ export const SwitchingGraphModal: React.FC<SwitchingGraphModalProps> = ({
       if (Math.hypot(dx, dy) > 4) {
         hasMovedRef.current = true;
       }
-      setPan({
-        x: panStartRef.current.x + dx,
-        y: panStartRef.current.y + dy,
-      });
+      const nextX = panStartRef.current.x + dx;
+      const nextY = panStartRef.current.y + dy;
+      if (rafPanRef.current === null) {
+        rafPanRef.current = requestAnimationFrame(() => {
+          rafPanRef.current = null;
+          setPan({ x: nextX, y: nextY });
+        });
+      }
     }
   };
 

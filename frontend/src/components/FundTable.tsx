@@ -179,7 +179,7 @@ export const FundTable: React.FC<FundTableProps> = ({ funds, onSelectFund, onOpe
                 <TableRow
                   key={fund.symbol}
                   onClick={() => onSelectFund(fund.symbol)}
-                  className="cursor-pointer group"
+                  className="render-optimized-row cursor-pointer group"
                 >
                   {/* Name & Badges */}
                   <TableCell className="py-3 px-4">

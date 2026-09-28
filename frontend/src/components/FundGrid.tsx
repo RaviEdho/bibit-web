@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback, useDeferredValue, useEffect, useRef } from "react";
 import { FundSummary } from "../types/fund";
 import { FundCard, ReturnTimeframe } from "./FundCard";
 import { FundTable } from "./FundTable";
@@ -13,6 +13,7 @@ import {
   ArrowRightLeft,
   X,
   SlidersHorizontal,
+  Loader2,
 } from "lucide-react";
 import { formatManagerName } from "../utils/formatters";
 import { Input } from "./ui/input";
@@ -33,8 +34,15 @@ interface FundGridProps {
 
 type SortOption = "quality_desc" | "return_desc" | "aum_desc" | "mdd_asc" | "name_asc";
 
+const INITIAL_BATCH_SIZE = 36;
+const BATCH_INCREMENT = 36;
+
 export const FundGrid: React.FC<FundGridProps> = ({ funds, onSelectFund, onOpenSwitchGraph }) => {
   const [searchQuery, setSearchQuery] = useState("");
+  // Deferred value keeps input typing instantaneous at 120 FPS
+  const deferredSearchQuery = useDeferredValue(searchQuery);
+  const isStale = searchQuery !== deferredSearchQuery;
+
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [activeTimeframe, setActiveTimeframe] = useState<ReturnTimeframe>("1y");
   const [sortOption, setSortOption] = useState<SortOption>("quality_desc");
@@ -45,6 +53,10 @@ export const FundGrid: React.FC<FundGridProps> = ({ funds, onSelectFund, onOpenS
   const [onlyIndex, setOnlyIndex] = useState<boolean>(false);
   const [onlyDividend, setOnlyDividend] = useState<boolean>(false);
   const [onlySwitchable, setOnlySwitchable] = useState<boolean>(false);
+
+  // Incremental rendering batch size
+  const [visibleCount, setVisibleCount] = useState<number>(INITIAL_BATCH_SIZE);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   const categories = [
     { id: "ALL", label: "Semua", dot: "bg-muted-foreground" },
@@ -77,7 +89,7 @@ export const FundGrid: React.FC<FundGridProps> = ({ funds, onSelectFund, onOpenS
     });
   };
 
-  // Step 1: Filter by category, special tags, and search
+  // Step 1: Filter by category, special tags, and deferred search
   const categoryMatchedFunds = useMemo(() => {
     return funds.filter((fund) => {
       if (selectedCategories.length > 0) {
@@ -104,15 +116,15 @@ export const FundGrid: React.FC<FundGridProps> = ({ funds, onSelectFund, onOpenS
         return false;
       }
 
-      if (!searchQuery.trim()) return true;
-      const q = searchQuery.toLowerCase();
+      if (!deferredSearchQuery.trim()) return true;
+      const q = deferredSearchQuery.toLowerCase();
       return (
         fund.name.toLowerCase().includes(q) ||
         fund.symbol.toLowerCase().includes(q) ||
         (fund.manager && (fund.manager.toLowerCase().includes(q) || formatManagerName(fund.manager).toLowerCase().includes(q)))
       );
     });
-  }, [funds, selectedCategories, onlySyariah, onlyInstant, onlyIndex, onlyDividend, onlySwitchable, searchQuery]);
+  }, [funds, selectedCategories, onlySyariah, onlyInstant, onlyIndex, onlyDividend, onlySwitchable, deferredSearchQuery]);
 
   // Step 2: Counts
   const tradableCount = useMemo(() => {
@@ -176,6 +188,44 @@ export const FundGrid: React.FC<FundGridProps> = ({ funds, onSelectFund, onOpenS
       });
   }, [categoryMatchedFunds, onlyTradable, sortOption, activeTimeframe]);
 
+  // Reset visibleCount whenever filters change to keep initial DOM lightweight
+  useEffect(() => {
+    setVisibleCount(INITIAL_BATCH_SIZE);
+  }, [selectedCategories, onlyTradable, onlySyariah, onlyInstant, onlyIndex, onlyDividend, onlySwitchable, deferredSearchQuery, sortOption]);
+
+  // IntersectionObserver for auto-infinite scrolling
+  useEffect(() => {
+    if (viewMode !== "card") return;
+    const sentinel = loadMoreRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setVisibleCount((prev) => Math.min(prev + BATCH_INCREMENT, filteredAndSortedFunds.length));
+        }
+      },
+      { rootMargin: "300px" }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [viewMode, filteredAndSortedFunds.length]);
+
+  // Sliced funds for card mode to avoid rendering 3,500+ DOM nodes at once
+  const visibleFunds = useMemo(() => {
+    return filteredAndSortedFunds.slice(0, visibleCount);
+  }, [filteredAndSortedFunds, visibleCount]);
+
+  // Stable callbacks for React.memo on FundCard
+  const handleSelectFund = useCallback((symbol: string) => {
+    onSelectFund(symbol);
+  }, [onSelectFund]);
+
+  const handleOpenSwitchGraph = useCallback((symbol?: string) => {
+    onOpenSwitchGraph?.(symbol);
+  }, [onOpenSwitchGraph]);
+
   const activeFiltersCount =
     (onlySyariah ? 1 : 0) +
     (onlyInstant ? 1 : 0) +
@@ -199,9 +249,13 @@ export const FundGrid: React.FC<FundGridProps> = ({ funds, onSelectFund, onOpenS
       {/* Top Search & Display Controls Bar */}
       <div className="bg-card/70 border border-border/80 rounded-2xl p-3 sm:p-4 shadow-sm space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          {/* Search Bar with integrated count */}
+          {/* Search Bar with live indicator */}
           <div className="relative flex-1 max-w-md">
-            <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+            {isStale ? (
+              <Loader2 className="w-4 h-4 text-primary absolute left-3 top-1/2 -translate-y-1/2 animate-spin" />
+            ) : (
+              <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+            )}
             <Input
               type="text"
               placeholder="Cari nama reksa dana, kode, atau MI..."
@@ -213,6 +267,7 @@ export const FundGrid: React.FC<FundGridProps> = ({ funds, onSelectFund, onOpenS
               <button
                 onClick={() => setSearchQuery("")}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5 rounded transition-colors"
+                title="Hapus pencarian"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -432,7 +487,7 @@ export const FundGrid: React.FC<FundGridProps> = ({ funds, onSelectFund, onOpenS
 
       {/* Main Content Area */}
       {viewMode === "table" ? (
-        <FundTable funds={filteredAndSortedFunds} onSelectFund={onSelectFund} onOpenSwitchGraph={onOpenSwitchGraph} />
+        <FundTable funds={filteredAndSortedFunds} onSelectFund={handleSelectFund} onOpenSwitchGraph={handleOpenSwitchGraph} />
       ) : (
         <>
           {filteredAndSortedFunds.length === 0 ? (
@@ -444,22 +499,37 @@ export const FundGrid: React.FC<FundGridProps> = ({ funds, onSelectFund, onOpenS
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-              {filteredAndSortedFunds.map((fund) => (
+              {visibleFunds.map((fund) => (
                 <FundCard
                   key={fund.symbol}
                   fund={fund}
                   timeframe={activeTimeframe}
-                  onClick={() => onSelectFund(fund.symbol)}
-                  onOpenSwitchGraph={onOpenSwitchGraph}
+                  onSelect={handleSelectFund}
+                  onOpenSwitchGraph={handleOpenSwitchGraph}
                 />
               ))}
             </div>
           )}
 
+          {/* Infinite Scroll Sentinel / Load More Controls */}
+          {viewMode === "card" && filteredAndSortedFunds.length > visibleCount && (
+            <div ref={loadMoreRef} className="pt-4 pb-2 flex flex-col items-center justify-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setVisibleCount((prev) => Math.min(prev + BATCH_INCREMENT, filteredAndSortedFunds.length))}
+                className="text-xs gap-1.5"
+              >
+                <span>Tampilkan {Math.min(BATCH_INCREMENT, filteredAndSortedFunds.length - visibleCount)} Produk Lagi</span>
+                <span className="text-[11px] text-muted-foreground font-mono">({visibleCount}/{filteredAndSortedFunds.length})</span>
+              </Button>
+            </div>
+          )}
+
           <div className="text-center text-xs text-muted-foreground pt-2">
             {onlyTradable
-              ? `Menampilkan ${filteredAndSortedFunds.length} reksa dana aktif dijual di Bibit`
-              : `Menampilkan ${filteredAndSortedFunds.length} reksa dana (katalog lengkap termasuk produk tutup)`}
+              ? `Menampilkan ${Math.min(visibleCount, filteredAndSortedFunds.length)} dari ${filteredAndSortedFunds.length} reksa dana aktif dijual di Bibit`
+              : `Menampilkan ${Math.min(visibleCount, filteredAndSortedFunds.length)} dari ${filteredAndSortedFunds.length} reksa dana katalog`}
           </div>
         </>
       )}

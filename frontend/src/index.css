@@ -110,4 +110,15 @@
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
+
+  /* Browser layout-skip optimizations for off-screen cards & rows */
+  .render-optimized-card {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 240px;
+  }
+
+  .render-optimized-row {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 52px;
+  }
 }

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback } from "react";
 import { FundSummary } from "../types/fund";
 import { formatAum, formatPercent, formatManagerName } from "../utils/formatters";
 import { TrendingUp, TrendingDown, ChevronRight, Zap, Banknote, ArrowRightLeft, Sparkles } from "lucide-react";
@@ -10,11 +10,18 @@ export type ReturnTimeframe = "1d" | "1m" | "ytd" | "1y" | "3y" | "5y";
 interface FundCardProps {
   fund: FundSummary;
   timeframe: ReturnTimeframe;
-  onClick: () => void;
+  onClick?: () => void;
+  onSelect?: (symbol: string) => void;
   onOpenSwitchGraph?: (symbol: string) => void;
 }
 
-export const FundCard: React.FC<FundCardProps> = ({ fund, timeframe, onClick, onOpenSwitchGraph }) => {
+const FundCardComponent: React.FC<FundCardProps> = ({
+  fund,
+  timeframe,
+  onClick,
+  onSelect,
+  onOpenSwitchGraph,
+}) => {
   // Determine return value and label based on timeframe
   let returnValue: number | null = null;
   let returnLabel = "Return 1 Th";
@@ -114,10 +121,25 @@ export const FundCard: React.FC<FundCardProps> = ({ fund, timeframe, onClick, on
     }
   };
 
+  const handleCardClick = useCallback(() => {
+    if (onSelect) {
+      onSelect(fund.symbol);
+    } else if (onClick) {
+      onClick();
+    }
+  }, [onSelect, onClick, fund.symbol]);
+
+  const handleSwitchClick = useCallback((e: React.MouseEvent) => {
+    if (onOpenSwitchGraph) {
+      e.stopPropagation();
+      onOpenSwitchGraph(fund.symbol);
+    }
+  }, [onOpenSwitchGraph, fund.symbol]);
+
   return (
     <Card
-      onClick={onClick}
-      className="bg-card/90 hover:bg-accent/40 border-border/80 hover:border-primary/50 transition-all duration-200 cursor-pointer shadow-md hover:shadow-primary/5 active:scale-[0.99] flex flex-col justify-between group p-4 sm:p-5"
+      onClick={handleCardClick}
+      className="render-optimized-card bg-card/90 hover:bg-accent/40 border-border/80 hover:border-primary/50 transition-all duration-200 cursor-pointer shadow-md hover:shadow-primary/5 active:scale-[0.99] flex flex-col justify-between group p-4 sm:p-5"
     >
       {/* Top Header: Badges */}
       <div>
@@ -163,12 +185,7 @@ export const FundCard: React.FC<FundCardProps> = ({ fund, timeframe, onClick, on
           {(fund.switch_destinations_count ?? 0) > 0 && (
             <button
               type="button"
-              onClick={(e) => {
-                if (onOpenSwitchGraph) {
-                  e.stopPropagation();
-                  onOpenSwitchGraph(fund.symbol);
-                }
-              }}
+              onClick={handleSwitchClick}
               className="inline-flex items-center gap-0.5 rounded-md border border-cyan-800/60 bg-cyan-950/80 hover:bg-cyan-900 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-300 transition-colors"
               title={`Mendukung switching ke ${fund.switch_destinations_count} produk. Klik untuk buka di graf.`}
             >
@@ -254,3 +271,5 @@ export const FundCard: React.FC<FundCardProps> = ({ fund, timeframe, onClick, on
     </Card>
   );
 };
+
+export const FundCard = React.memo(FundCardComponent);
