@@ -2,6 +2,13 @@ import React, { useEffect, useState, useMemo, useRef } from "react";
 import { SwitchingGraphResponse, GraphNode, FundSummary } from "../types/fund";
 import { formatAum, formatCurrency, formatManagerName, formatPercent } from "../utils/formatters";
 import { X, ArrowRightLeft, Search, Building2, ExternalLink, Network, ListTree, Sparkles, ChevronUp, ChevronDown, Zap, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
+import { Badge } from "./ui/badge";
 
 interface SwitchingGraphModalProps {
   isOpen: boolean;
@@ -407,28 +414,26 @@ export const SwitchingGraphModal: React.FC<SwitchingGraphModalProps> = ({
       setFocusMode("targets");
     }
   };
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-sm overflow-y-auto custom-scrollbar">
-      <div className="relative w-full max-w-6xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden my-auto max-h-[96vh] flex flex-col">
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent hideCloseButton className="max-w-6xl w-[95vw] h-[94vh] max-h-[94vh] p-0 flex flex-col gap-0 overflow-hidden bg-card border-border shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-2.5 sm:px-5 sm:py-3 border-b border-slate-800 bg-slate-900/95">
+        <DialogHeader className="flex flex-row items-center justify-between px-4 py-2.5 sm:px-5 sm:py-3 border-b border-border bg-card/95 text-left shrink-0 space-y-0">
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
             <div className="w-8 h-8 rounded-lg bg-cyan-950 border border-cyan-700/60 flex items-center justify-center text-cyan-400 shadow shrink-0">
               <ArrowRightLeft className="w-4 h-4" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h2 className="text-sm sm:text-base font-bold text-white tracking-tight truncate">
+                <DialogTitle className="text-sm sm:text-base font-bold text-foreground tracking-tight truncate">
                   Peta Switching Reksa Dana
-                </h2>
-                <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-300 border border-cyan-800 shrink-0">
+                </DialogTitle>
+                <Badge variant="cyan" className="hidden sm:inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0">
                   <Sparkles className="w-2.5 h-2.5" />
                   Visual Graf
-                </span>
+                </Badge>
               </div>
-              <p className="text-[11px] text-slate-400 truncate mt-0.5">
+              <p className="text-[11px] text-muted-foreground truncate mt-0.5">
                 Arah pengalihan produk per Manajer Investasi
               </p>
             </div>
@@ -436,23 +441,23 @@ export const SwitchingGraphModal: React.FC<SwitchingGraphModalProps> = ({
 
           <div className="flex items-center gap-2 shrink-0">
             {data && (
-              <div className="hidden md:flex items-center gap-1.5 text-xs font-mono bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700/60 text-slate-300">
+              <div className="hidden md:flex items-center gap-1.5 text-xs font-mono bg-secondary/80 px-2.5 py-1 rounded-lg border border-border text-muted-foreground">
                 <span>{data.total_funds} Produk</span>
-                <span className="text-slate-600">&bull;</span>
+                <span className="text-muted-foreground/60">&bull;</span>
                 <span className="text-cyan-400">{data.total_edges} Jalur</span>
-                <span className="text-slate-600">&bull;</span>
+                <span className="text-muted-foreground/60">&bull;</span>
                 <span>{data.total_managers} MI</span>
               </div>
             )}
             <button
               onClick={onClose}
-              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+              className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors"
               title="Tutup (Esc)"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
-        </div>
+        </DialogHeader>
 
         {/* Toolbar & Controls */}
         <div className="px-3 py-2 sm:px-5 sm:py-2.5 border-b border-slate-800/80 bg-slate-900/60 flex flex-wrap items-center justify-between gap-2 sm:gap-2.5">
@@ -1587,7 +1592,7 @@ export const SwitchingGraphModal: React.FC<SwitchingGraphModalProps> = ({
             )}
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
