@@ -72,9 +72,7 @@ export function computeRangeMetrics(
   }
 
   const ulcerIndex = Math.sqrt(drawdowns.reduce((acc, d) => acc + Math.pow(d, 2), 0) / n);
-  const excessReturnPct = (totalReturn * 100) - (annualRiskFreeRate * 100);
   const effectiveUlcer = Math.max(ulcerIndex, 0.05);
-  const martinRatio = excessReturnPct / effectiveUlcer;
 
   // 4. Annualized Volatility, Downside Volatility, Sharpe & Sortino Ratios
   const m = dailyReturns.length;
@@ -103,7 +101,8 @@ export function computeRangeMetrics(
 
   const excessPct = calendarDays >= 365
     ? (cagr * 100) - (annualRiskFreeRate * 100)
-    : (totalReturn * 100) - (annualRiskFreeRate * 100);
+    : (totalReturn * 100) - (annualRiskFreeRate * (calendarDays / 365.25) * 100);
+  const martinRatio = excessPct / effectiveUlcer;
   const mddPct = Math.abs(maxDd * 100);
   const painIndex = 0.25 + Math.max(0, ulcerIndex) + (0.10 * mddPct) + (0.03 * Math.pow(mddPct, 2));
   const qualityScore = excessPct >= 0

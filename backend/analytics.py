@@ -46,7 +46,8 @@ def calculate_max_drawdown(nav_series: list[float]) -> float:
 
 def calculate_ulcer_index(
     nav_series: list[float],
-    annual_rf: float = DEFAULT_ANNUAL_RF
+    annual_rf: float = DEFAULT_ANNUAL_RF,
+    calendar_days: float | None = None
 ) -> tuple[float, float]:
     """
     Calculates Ulcer Index (UI) and Martin Ratio (Ulcer Performance Index - UPI).
@@ -71,7 +72,11 @@ def calculate_ulcer_index(
     ui = math.sqrt(sum(d ** 2 for d in drawdowns) / m)
 
     ret_pct = ((nav_series[-1] - nav_series[0]) / nav_series[0] * 100) if nav_series[0] > 0 else 0.0
-    excess_pct = ret_pct - (annual_rf * 100)
+    if calendar_days is not None and calendar_days < 365:
+        rf_pct = annual_rf * (calendar_days / 365.25) * 100
+    else:
+        rf_pct = annual_rf * 100
+    excess_pct = ret_pct - rf_pct
     eff_ui = max(ui, 0.05)
     martin = excess_pct / eff_ui
 
@@ -182,8 +187,12 @@ def compute_metrics_for_window(
     cagr = calculate_cagr(navs[0], navs[-1], calendar_days)
     mdd = calculate_max_drawdown(navs)
     vol, sharpe, sortino, downside_vol = calculate_volatility_and_sharpe(navs, annual_rf)
-    ui, martin = calculate_ulcer_index(navs, annual_rf)
-    excess_pct = (cagr * 100 - annual_rf * 100) if calendar_days >= 365 else (s_ret * 100 - annual_rf * 100)
+    ui, martin = calculate_ulcer_index(navs, annual_rf, calendar_days)
+    if calendar_days >= 365:
+        excess_pct = (cagr * 100) - (annual_rf * 100)
+    else:
+        period_rf = annual_rf * (calendar_days / 365.25)
+        excess_pct = (s_ret * 100) - (period_rf * 100)
     qs = calculate_quality_score(excess_pct, ui, mdd * 100)
     return {
         "return": round(s_ret * 100, 2),
@@ -256,23 +265,28 @@ def compute_all_presets(history: list[dict], reference_date_str: str | None = No
     d_end = datetime.strptime(history[-1]["date"], "%Y-%m-%d")
     all_days = max(1, (d_end - d_start).days)
     navs = [p["nav"] for p in history]
+    s_ret_all = calculate_simple_return(navs[0], navs[-1])
+    cagr_all = calculate_cagr(navs[0], navs[-1], all_days)
+    mdd_all = calculate_max_drawdown(navs)
     vol_all, sharpe_all, sortino_all, downside_vol_all = calculate_volatility_and_sharpe(navs, annual_rf)
-    ui_all, martin_all = calculate_ulcer_index(navs, annual_rf)
+    ui_all, martin_all = calculate_ulcer_index(navs, annual_rf, all_days)
+    if all_days >= 365:
+        excess_pct_all = (cagr_all * 100) - (annual_rf * 100)
+    else:
+        period_rf_all = annual_rf * (all_days / 365.25)
+        excess_pct_all = (s_ret_all * 100) - (period_rf_all * 100)
+    qs_all = calculate_quality_score(excess_pct_all, ui_all, mdd_all * 100)
     m_all = {
-        "return": round(calculate_simple_return(navs[0], navs[-1]) * 100, 2),
-        "cagr": round(calculate_cagr(navs[0], navs[-1], all_days) * 100, 2),
-        "max_drawdown": round(calculate_max_drawdown(navs) * 100, 2),
+        "return": round(s_ret_all * 100, 2),
+        "cagr": round(cagr_all * 100, 2),
+        "max_drawdown": round(mdd_all * 100, 2),
         "sharpe": round(sharpe_all, 2),
         "sortino": round(sortino_all, 2),
         "volatility": round(vol_all * 100, 2),
         "downside_volatility": round(downside_vol_all * 100, 2),
         "ulcer_index": round(ui_all, 2),
         "martin_ratio": round(martin_all, 2),
-        "quality_score": round(calculate_quality_score(
-            calculate_cagr(navs[0], navs[-1], all_days) * 100 - annual_rf * 100,
-            ui_all,
-            calculate_max_drawdown(navs) * 100
-        ), 2),
+        "quality_score": round(qs_all, 2),
     }
 
     return {
